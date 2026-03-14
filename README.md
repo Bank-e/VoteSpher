@@ -1,8 +1,8 @@
 # VoteSpher
 ---
 # ปริญ จิระมหาโภคี (ฟูจิ)
-POST- /voter/verify
-POST- /voter/otp-request
+ * POST- /voter/verify
+ * POST- /voter/otp-request
 
 # อัฐภิญญา กำหนด (ฟ้าคราม)
 GET- /candidates
