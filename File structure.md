@@ -68,5 +68,5 @@ election-api/
 ├── .gitignore                           // ไม่ track .env, binary, vendor/, tmp/
 ├── go.mod                               // ชื่อ module + Go version + direct dependencies
 ├── go.sum                               // checksum ทุก dependency — ไม่แก้มือ
-└── Makefile                             // make run, make build, make migrate, make test, make mock  ในส่วนของ database ถ้าใช้เป็น sql จะต้องเขียนยังไง
+└── Makefile                             // make run, make build, make migrate, make test, make
 ```
