@@ -2,71 +2,88 @@
 
 ---
 
-```File structure
-election-api/
-├── cmd/
-│   └── server/
-│       └── main.go                      // ประกอบ dependency ทุกชิ้น, เริ่ม HTTP server + Graceful Shutdown
-├── config/
-│   └── config.go                        // อ่าน env vars → struct Config (DB, Port, JWT, Admin, Port)
-├── internal/                            // โค้ด business หลัก — Go ป้องกันไม่ให้ package นอกโปรเจกต์ import
-│   ├── domain/                          // structs กลาง + interfaces — ทุก layer ใช้ร่วมกัน
-│   │   ├── voter.go                     // struct Voter, VoterInfo, AccessToken
-│   │   ├── otp.go                       // struct OTP, OTPResult
-│   │   ├── candidate.go                 // struct Candidate, Party
-│   │   ├── ballot.go                    // struct Ballot, BallotResult, VoteStatus
-│   │   ├── result.go                    // struct ElectionResult, ResultSummary, AreaResult
-│   │   ├── system_config.go             // struct SystemConfig (is_voting_open, end_time)
-│   │   ├── service_interfaces.go        // interface AuthService, OTPService, BallotService ฯลฯ — handler คุยผ่านนี้
-│   │   └── repository_interfaces.go     // interface VoterRepo, OTPRepo, BallotRepo ฯลฯ — service คุยผ่านนี้
-│   ├── handler/                         // layer 1: รับ HTTP, validate input, ส่งต่อ service
-│   │   ├── auth_handler.go              // POST /voter/verify, /otp-request, /otp-confirm
-│   │   ├── candidate_handler.go         // GET /candidates, GET /parties
-│   │   ├── ballot_handler.go            // POST /ballot/submit, GET /ballot/status
-│   │   ├── result_handler.go            // GET /results/realtime, GET /results/area/:id
-│   │   └── admin_handler.go             // PATCH /election/config
-│   ├── service/                         // layer 2: business logic ทั้งหมด
-│   │   ├── auth_service.go              // hash citizen_id, ตรวจสิทธิ์, สร้าง JWT
-│   │   ├── otp_service.go               // สร้าง/validate/invalidate OTP, เรียก SMS gateway
-│   │   ├── candidate_service.go         // ดึงผู้สมัคร + join ข้อมูลพรรค
-│   │   ├── ballot_service.go            // ตรวจ is_voted, บันทึก DB transaction, อัปเดต flag
-│   │   ├── result_service.go            // aggregate คะแนน, ดึง/เขียน จาก MySQL
-│   │   └── admin_service.go             // ตรวจ admin token, อัปเดต system config
-│   ├── repository/                      // layer 3: คุยกับ DB โดยตรง
-│   │   ├── voter_repo.go                // FindByHashAndArea(), UpdateVotedStatus()
-│   │   ├── otp_repo.go                  // Save(), FindByVoterID(), Invalidate() — ใช้ MySQL ล้วน
-│   │   ├── candidate_repo.go            // FindByArea() — query CANDIDATES join PARTIES
-│   │   ├── ballot_repo.go               // SubmitWithTransaction() — INSERT VOTES + UPDATE VOTERS atomic
-│   │   ├── result_repo.go               // aggregate COUNT GROUP BY, อ่าน/เขียน
-│   │   └── config_repo.go               // GetConfig(), UpdateConfig()
-│   ├── middleware/                      // ตรวจสอบก่อนเข้า handler
-│   │   ├── jwt_middleware.go            // decode JWT, inject voter_id + area_id ลง Gin context
-│   │   └── admin_middleware.go          // ตรวจ static admin token → 401 ถ้าไม่ตรง
-│   └── router/                          // ลงทะเบียน routes ทั้งหมดในที่เดียว
-│       └── router.go                    // gin.Group() แยกหมวด, ผูก middleware กับ group ที่ต้องการ
-├── pkg/                                 // utility ไม่มี business logic — reuse ได้ทั่วโปรเจกต์
-│   ├── hash/
-│   │   └── sha256.go                    // Hash(input) string — ใช้ crypto/sha256 hash citizen_id
-│   ├── jwt/
-│   │   └── jwt.go                       // Encode(payload, secret), Decode(token, secret)
-│   ├── otp/
-│   │   └── generator.go                 // Generate() string — สุ่ม 6 หลักด้วย crypto/rand
-│   ├── sms/
-│   │   └── gateway.go                   // interface SMSGateway + MockSMSGateway สำหรับ test/dev
-│   └── response/
-│       └── response.go                  // Success(c, data), Error(c, code, msg) — JSON response มาตรฐาน
-├── database/
-│   ├── mysql.go
-│   └── migrations/                      // SQL schema — รันตามลำดับด้วย golang-migrate
-│       ├── 001_create_voters.sql         // ตาราง VOTERS (voter_id, citizen_id_hash, area_id, phone, is_voted)
-│       ├── 002_create_candidates.sql     // ตาราง CANDIDATES (candidate_id, area_id, party_id, no, name)
-│       ├── 003_create_parties.sql        // ตาราง PARTIES (party_id, party_name, logo_url)
-│       ├── 004_create_votes.sql          // ตาราง VOTES (vote_id, voter_id, area_id, candidate_no, fingerprint)
-│       └── 005_create_system_config.sql  // ตาราง SYSTEM_CONFIG (is_voting_open, end_time)
-│       └── 006_create_otps.sql
-├── .env.example                         // ตัวอย่าง env vars — ก็อปไปสร้าง .env จริง (ไม่ commit ค่าจริง)
-├── .gitignore                           // ไม่ track .env, binary, vendor/, tmp/
-├── go.mod                               // ชื่อ module + Go version + direct dependencies
-├── go.sum                               // checksum ทุก dependency — ไม่แก้มือ
-└── Makefile                             // make run, make build, make migrate, make test, make
+```File_structure
+
+VOTESPHER/                           # root ของโปรเจกต์ทั้งหมด
+│
+├── cmd/                             # entry point ของแอปพลิเคชัน
+│   └── server/                      # HTTP server หลัก
+│       └── main.go                  # จุดเริ่มต้นโปรแกรม: เริ่ม server, โหลด config,
+│                                    # register routes, inject dependencies
+│
+├── config/                          # ตั้งค่าการเชื่อมต่อและ environment ต่าง ๆ
+│   └── database.go                  # เชื่อมต่อฐานข้อมูล (DSN, connection pool,
+│                                    # ping check) อ่านค่าจาก env vars
+│
+├── database/                        # SQL migration files — รันตามลำดับตัวเลขนำหน้า
+│   ├── 001_create_voters.sql        # ตารางผู้มีสิทธิ์เลือกตั้ง (voter_id, ชื่อ, สถานะ)
+│   ├── 002_create_candidates.sql    # ตารางผู้สมัคร (candidate_id, ชื่อ, สังกัดพรรค)
+│   ├── 003_create_parties.sql       # ตารางพรรคการเมือง / กลุ่ม
+│   ├── 004_create_votes.sql         # ตารางบันทึกการโหวต (voter → candidate, timestamp)
+│   ├── 005_create_system_config.sql # ตั้งค่าระบบ เช่น ช่วงเวลาเปิด-ปิดการโหวต
+│   └── 006_create_otps.sql          # ตาราง OTP ใช้ยืนยันตัวตนก่อนโหวต (code, expire_at)
+│
+├── internal/                        # business logic หลักทั้งหมด แบ่งตาม domain
+│   │                                # แต่ละ module ใช้ pattern: Handler → Service → Repository
+│   │
+│   ├── auth/                        # จัดการ authentication และ authorization
+│   │   ├── handler.go               # รับ HTTP request: login, logout, ขอ OTP
+│   │   │                            # ส่ง response JSON กลับ client
+│   │   ├── model.go                 # struct: LoginRequest, LoginResponse,
+│   │   │                            # OTPRequest, TokenClaims
+│   │   ├── repository.go            # query ฐานข้อมูล: ค้นหา voter, บันทึก OTP,
+│   │   │                            # ตรวจสอบ session
+│   │   └── service.go               # business logic: ตรวจ OTP, สร้าง JWT token,
+│   │                                # validate credentials
+│   │
+│   ├── info/                        # ดึงข้อมูลสำหรับแสดงผล (read-only mostly)
+│   │   ├── handler.go               # endpoint: GET candidates, GET parties, GET system config
+│   │   ├── model.go                 # struct: Candidate, Party, SystemConfig
+│   │   ├── repository.go            # query ดึงรายชื่อผู้สมัคร, พรรค, ข้อมูลการเลือกตั้ง
+│   │   └── service.go               # จัดรูปแบบข้อมูล, กรองตามเงื่อนไข
+│   │
+│   ├── middleware/                  # middleware ที่รันก่อน handler ทุก request
+│   │   └── jwt_middleware.go        # ตรวจสอบ JWT token ใน Authorization header
+│   │                                # ถ้า token ไม่ valid → ตอบ 401 Unauthorized
+│   │                                # ถ้าผ่าน → ส่ง claims ต่อให้ handler ผ่าน context
+│   │
+│   ├── result/                      # คำนวณและแสดงผลการเลือกตั้ง
+│   │   ├── handler.go               # endpoint: GET /results — ผลรวมคะแนนทั้งหมด
+│   │   ├── model.go                 # struct: VoteResult, CandidateScore, Summary
+│   │   ├── repository.go            # query นับคะแนน GROUP BY candidate
+│   │   └── service.go               # คำนวณ % คะแนน, จัดอันดับ, สรุปผล
+│   │
+│   └── voting/                      # จัดการการโหวตของผู้ใช้
+│       ├── handler.go               # endpoint: POST /vote — รับคะแนนจาก voter
+│       ├── model.go                 # struct: VoteRequest, VoteRecord
+│       ├── repository.go            # INSERT vote, ตรวจว่า voter โหวตไปแล้วหรือยัง
+│       └── service.go               # validate: ช่วงเวลา, สิทธิ์, ซ้ำซ้อน
+│                                    # เรียก repository เพื่อบันทึก vote
+│
+├── pkg/                             # shared utilities ที่ใช้ได้ทั่วทั้งโปรเจกต์
+│   └── jwt.go                       # helper functions: GenerateToken(claims),
+│                                    # ParseToken(tokenStr) → คืน claims หรือ error
+│
+├── go.mod                           # จัดการ dependencies (module name, Go version, packages)
+├── Makefile                         # คำสั่งลัด: make run / make migrate / make build
+├── File structure.md                # เอกสารอธิบายโครงสร้างโปรเจกต์
+└── README.md                        # คู่มือการติดตั้งและใช้งานโปรเจกต์
+
+# ============================================================
+# DATA FLOW
+# ============================================================
+#
+#   HTTP Request
+#       ↓
+#   JWT Middleware
+#       ↓
+#   Handler         ← รับ request, parse body/params
+#       ↓
+#   Service         ← business logic, validation
+#       ↓
+#   Repository      ← query / write ฐานข้อมูล
+#       ↓
+#   Database (PostgreSQL / MySQL หรืออื่นๆ)
+#
+# ============================================================
 ```
