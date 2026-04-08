@@ -1,16 +1,17 @@
 package main
 
 import (
-    "VoteSphere/config"
+	"votespher/config"
+	"votespher/migration"
 )
 
 func main() {
-    // โหลด .env ก่อนทุกอย่าง
-    config.LoadEnv()
+	config.LoadEnv()
 
-    // เชื่อมต่อ DB
-    db := config.ConnectDB()
-    defer db.Close()
+	db := config.ConnectDB()
 
-    // ... register routes, inject db ต่อไป
+	// รัน migration ทุกครั้งที่ start server
+	migration.Run(db)
+
+	// ... register routes ต่อไป
 }
