@@ -1,6 +1,6 @@
 # VoteSpher
 ---
-# ปริญ จิระมหาโภคี (ฟูจิ) @FujiDesu
+# ปริญ จิระมหาโภคี (ฟูจิ) <a href="https://github.com/FujiDesu">
  * POST- /voter/verify
  * POST- /voter/otp-request
 
