@@ -1,23 +1,23 @@
 # VoteSpher
 ---
-# ปริญ จิระมหาโภคี (ฟูจิ) <a href="https://github.com/FujiDesu">FujiDesu</a>
+# <a href="https://github.com/FujiDesu">ปริญ จิระมหาโภคี 6609650475 (ฟูจิ)</a>
  * POST- /voter/verify
  * POST- /voter/otp-request
 
-# อัฐภิญญา กำหนด (ฟ้าคราม) <a href="https://github.com/Autthapinyakn">Autthapinya Kumnod - 6609650749</a>
+# <a href="https://github.com/Autthapinyakn">อัฐภิญญา กำหนด 6609650749 (ฟ้าคราม)</a>
  * GET- /candidates
  * GET- /parties
 
-# ปิยะชาติ สลางสิงห์ (แบงค์) <a href="https://github.com/Bank-e">Bank-e</a>
+# <a href="https://github.com/Bank-e">ปิยะชาติ สลางสิงห์ 6609650061 (แบงค์)</a>
  * POST-/ballot/submit
  * GET- /ballot/status
 
-# ชญาดา ธรรมวิชัย (น้ำฝน) <a href="https://github.com/Chayada23">Chayada23</a>
+# <a href="https://github.com/Chayada23">ชญาดา ธรรมวิชัย 6609650244 (น้ำฝน)</a>
  * GET /results/realtime
 
 # รัตนากร วังคีรี (พี่แนม) RW
  * GET- /results/provinces/{provinces_name}/areas/{area_id}
 
-# ภีมพัฒน์ จิราวัฒวาณิชย์ (เซีย) <a href="https://github.com/Xagatech">Xagatech</a>
+# <a href="https://github.com/Xagatech">ภีมพัฒน์ จิราวัฒวาณิชย์ 6609650566 (เซีย)</a>
  * POST- /voter/otp-confirm
  * PATCH /election/config
