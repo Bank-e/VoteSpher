@@ -18,7 +18,7 @@ func main() {
 	migration.Run(db)
 
 	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ) เพื่อให้มีข้อมูล ใช้ในกรณีไม่ใช้ cloud
-	migration.SeedData(db)
+	// migration.SeedData(db)
 
 	/*
 	// 4. สร้าง HTTP Router (ServeMux)
