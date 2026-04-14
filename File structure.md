@@ -15,14 +15,6 @@ VOTESPHER/                           # root ของโปรเจกต์ท
 │   └── database.go                  # เชื่อมต่อฐานข้อมูล (DSN, connection pool,
 │                                    # ping check) อ่านค่าจาก env vars
 │
-├── database/                        # SQL migration files — รันตามลำดับตัวเลขนำหน้า
-│   ├── 001_create_voters.sql        # ตารางผู้มีสิทธิ์เลือกตั้ง (voter_id, ชื่อ, สถานะ)
-│   ├── 002_create_candidates.sql    # ตารางผู้สมัคร (candidate_id, ชื่อ, สังกัดพรรค)
-│   ├── 003_create_parties.sql       # ตารางพรรคการเมือง / กลุ่ม
-│   ├── 004_create_votes.sql         # ตารางบันทึกการโหวต (voter → candidate, timestamp)
-│   ├── 005_create_system_config.sql # ตั้งค่าระบบ เช่น ช่วงเวลาเปิด-ปิดการโหวต
-│   └── 006_create_otps.sql          # ตาราง OTP ใช้ยืนยันตัวตนก่อนโหวต (code, expire_at)
-│
 ├── internal/                        # business logic หลักทั้งหมด แบ่งตาม domain
 │   │                                # แต่ละ module ใช้ pattern: Handler → Service → Repository
 │   │
