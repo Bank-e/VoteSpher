@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	// "log"
+	// "net/http"
 	"votespher/config"
-	"votespher/internal/election"
-	"votespher/internal/middleware"
+	// "votespher/internal/election"
+	// "votespher/internal/middleware"
 	"votespher/migration"
 )
 
@@ -17,7 +17,11 @@ func main() {
 	// 2. รัน migration ทุกครั้งที่ start server
 	migration.Run(db)
 
-	// 3. สร้าง HTTP Router (ServeMux)
+	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ) เพื่อให้มีข้อมูล ใช้ในกรณีไม่ใช้ cloud
+	migration.SeedData(db)
+
+	/*
+	// 4. สร้าง HTTP Router (ServeMux)
 	mux := http.NewServeMux()
 
 	// ==========================================
@@ -47,10 +51,11 @@ func main() {
 	mux.HandleFunc("/election/config", protectedAdminHandler)
 
 	// ==========================================
-	// 4. Start Server
+	// 5. Start Server
 	// ==========================================
 	log.Println("Server is running on port 8080...")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+		*/
 }
