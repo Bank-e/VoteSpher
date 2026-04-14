@@ -8,8 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// 1. สร้าง Custom Claims (ข้อมูลที่เราจะฝังลงไปใน Token)
-// ตามสเปค OpenAPI ของคุณ เราต้องฝัง voter_id, area_id และ role
 type JWTCustomClaims struct {
 	VoterID uint   `json:"voter_id"`
 	AreaID  uint   `json:"area_id"`
@@ -17,7 +15,7 @@ type JWTCustomClaims struct {
 	jwt.RegisteredClaims         // ตัวนี้จะจัดการเรื่อง วันหมดอายุ (exp), วันที่ออก (iat) ให้อัตโนมัติ
 }
 
-// 2. ฟังก์ชันสร้าง Token (ใช้ตอนยืนยัน OTP สำเร็จ)
+// ฟังก์ชันสร้าง Token (ใช้ตอนยืนยัน OTP สำเร็จ)
 func GenerateToken(voterID uint, areaID uint, role string, secretKey string) (string, error) {
 	// กำหนดอายุของ Token (เช่น ให้มีอายุ 2 ชั่วโมง)
 	expirationTime := time.Now().Add(2 * time.Hour)
@@ -30,7 +28,7 @@ func GenerateToken(voterID uint, areaID uint, role string, secretKey string) (st
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "election-system-api", // ระบุชื่อระบบที่ออก Token
+			Issuer:    "VoteSpher", // ระบุชื่อระบบที่ออก Token
 		},
 	}
 
@@ -46,7 +44,7 @@ func GenerateToken(voterID uint, areaID uint, role string, secretKey string) (st
 	return tokenString, nil
 }
 
-// 3. ฟังก์ชันอ่านและตรวจสอบ Token (ใช้ตอนดึงข้อมูลหรือทำ Middleware)
+// ฟังก์ชันอ่านและตรวจสอบ Token (ใช้ตอนดึงข้อมูลหรือทำ Middleware)
 func ValidateToken(tokenString string, secretKey string) (*JWTCustomClaims, error) {
 	// Parse Token พร้อมถอดรหัสออกมาใส่ Struct ที่เราเตรียมไว้
 	token, err := jwt.ParseWithClaims(tokenString, &JWTCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
