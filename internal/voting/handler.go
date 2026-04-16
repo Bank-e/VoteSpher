@@ -29,9 +29,18 @@ func SubmitBallotHandler(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		// แปลง Type ให้ถูกต้อง (ขึ้นอยู่กับว่า Middleware ยัดมาเป็น float64 หรือ uint)
-		voterID := uint(ctxVoterID.(float64))
-		areaID := uint(ctxAreaID.(float64))
+		// แปลง Type ให้เป็น uint ตรงๆ พร้อมดักจับ Error ป้องกัน Server พัง (Panic)
+        voterID, ok := ctxVoterID.(uint)
+        if !ok {
+            http.Error(w, `{"error_code": "SERVER_ERROR", "message": "voter_id ใน Token ไม่ใช่รูปแบบตัวเลข (uint)"}`, http.StatusInternalServerError)
+            return
+        }
+        
+        areaID, ok := ctxAreaID.(uint)
+        if !ok {
+            http.Error(w, `{"error_code": "SERVER_ERROR", "message": "area_id ใน Token ไม่ใช่รูปแบบตัวเลข (uint)"}`, http.StatusInternalServerError)
+            return
+        }
 
 		// 3. ส่งไปให้ Service จัดการ
 		err := SubmitVoteService(db, voterID, areaID, req)

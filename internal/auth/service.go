@@ -1,5 +1,4 @@
 package auth
->>>>>>> develop
 
 import (
 	"crypto/hmac"
@@ -31,7 +30,7 @@ func ConfirmOTP(db *gorm.DB, req OTPConfirmRequest) (*OTPConfirmResult, error) {
 	}
 
 	// 3. mark OTP ว่าใช้แล้ว (กันไม่ให้ใช้ซ้ำ)
-	if err := MarkOTPAsUsed(db, otp.OTPID); err != nil {
+	if err := MarkOTPAsUsed(db, otp.ID); err != nil {
 		return nil, err
 	}
 
@@ -43,7 +42,7 @@ func ConfirmOTP(db *gorm.DB, req OTPConfirmRequest) (*OTPConfirmResult, error) {
 
 	// 5. สร้าง JWT Token
 	secretKey := os.Getenv("JWT_SECRET_KEY")
-	token, err := pkg.GenerateToken(voter.VoterID, voter.AreaID, "voter", secretKey)
+	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, "voter", secretKey)
 	if err != nil {
 		return nil, err
 	}

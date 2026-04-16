@@ -1,11 +1,15 @@
 package main
 
 import (
-	// "log"
-	// "net/http"
+	"log"
+	"net/http"
 	"votespher/config"
+
+	"votespher/internal/auth"
 	// "votespher/internal/election"
-	// "votespher/internal/middleware"
+	"votespher/internal/voting"
+
+	"votespher/internal/middleware"
 	"votespher/migration"
 )
 
@@ -28,7 +32,7 @@ func main() {
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
 	// ตัวอย่าง (ถ้าคุณมี package auth/info):
-	http.HandleFunc("/dev/mock-token", auth.MockTokenHandler()) // สำหรับสร้าง JWT token จำลอง (ใช้ในการทดสอบ)
+	mux.HandleFunc("/dev/mock-token", auth.MockTokenHandler()) // สำหรับสร้าง JWT token จำลอง (ใช้ในการทดสอบ)
 	
 	// mux.HandleFunc("/v1/voter/verify", auth.VerifyVoterHandler(db))
 	// mux.HandleFunc("/v1/candidates", info.GetCandidatesHandler(db))
@@ -44,13 +48,15 @@ func main() {
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
 	// นำ Handler หลักมาครอบด้วย RequireRole และ RequireAuth ตามลำดับ 
+	/*
 	configHandler := election.UpdateConfigHandler(db)
 	protectedAdminHandler := middleware.RequireAuth(
 		middleware.RequireRole("admin", configHandler),
 	)
+	*/
 	
 	// ลงทะเบียน Route สำหรับแก้ไข Config
-	mux.HandleFunc("/election/config", protectedAdminHandler)
+	// mux.HandleFunc("/election/config", protectedAdminHandler)
 
 	// ==========================================
 	// 5. Start Server

@@ -3,14 +3,15 @@ package voting
 import (
 	"errors"
 	"time"
+	"votespher/internal/models"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 // GetActiveConfig ดึงการตั้งค่าระบบที่กำลังเปิดใช้งานอยู่
-func GetActiveConfig(db *gorm.DB) (*SystemConfig, error) {
-	var config SystemConfig
+func GetActiveConfig(db *gorm.DB) (*models.SystemConfig, error) {
+	var config models.SystemConfig // ใส่ models.
 	if err := db.Where("is_active = ?", true).First(&config).Error; err != nil {
 		return nil, errors.New("ไม่พบการตั้งค่าระบบเลือกตั้งที่ใช้งานอยู่")
 	}
@@ -18,9 +19,9 @@ func GetActiveConfig(db *gorm.DB) (*SystemConfig, error) {
 }
 
 // ExecuteVoteTransaction จัดการบันทึกคะแนนโหวตในรูปแบบ Transaction
-func ExecuteVoteTransaction(db *gorm.DB, voterID uint, voteRecord Vote) error {
+func ExecuteVoteTransaction(db *gorm.DB, voterID uint, voteRecord models.Vote) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		var voter Voter
+		var voter models.Voter // ใส่ models.
 		
 		// ล็อก Row ข้อมูลผู้โหวตคนนี้ (ป้องกัน Race condition หรือการยิง Request ซ้ำๆ เข้ามาพร้อมกัน)
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&voter, voterID).Error; err != nil {
