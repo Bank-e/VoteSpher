@@ -20,7 +20,7 @@ func main() {
 	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ) เพื่อให้มีข้อมูล ใช้ในกรณีไม่ใช้ cloud
 	// migration.SeedData(db)
 
-	/*
+	
 	// 4. สร้าง HTTP Router (ServeMux)
 	mux := http.NewServeMux()
 
@@ -35,8 +35,8 @@ func main() {
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
 	// ==========================================
 	// ตัวอย่างการครอบเฉพาะ RequireAuth:
-	// ballotSubmitHandler := middleware.RequireAuth(voting.SubmitBallotHandler(db))
-	// mux.HandleFunc("/v1/ballot/submit", ballotSubmitHandler)
+	ballotSubmitHandler := middleware.RequireAuth(voting.SubmitBallotHandler(db))
+	mux.HandleFunc("/ballot/submit", ballotSubmitHandler)
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
@@ -57,5 +57,4 @@ func main() {
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-		*/
 }

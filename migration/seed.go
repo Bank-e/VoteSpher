@@ -171,8 +171,7 @@ func SeedData(db *gorm.DB) {
 
     // 6. SystemConfigs (เปลี่ยน .AdminID เป็น .ID)
     configs := []models.SystemConfig{
-        {AdminID: admins[0].ID, Status: "OPEN", StartTime: parseTime("2026-04-14 08:00:00"), EndTime: parseTime("2026-04-14 17:00:00"), UpdatedAt: parseTime("2026-04-13 20:00:00"), IsActive: true},
-        {AdminID: admins[1].ID, Status: "DRAFT", StartTime: parseTime("2026-05-01 08:00:00"), EndTime: parseTime("2026-05-01 17:00:00"), UpdatedAt: parseTime("2026-04-10 10:00:00"), IsActive: false},
+        {AdminID: admins[0].ID, Status: "OPEN", StartTime: parseTime("2026-04-14 08:00:00"), EndTime: parseTime("2026-04-28 17:00:00"), UpdatedAt: parseTime("2026-04-13 20:00:00"), IsActive: true},
     }
     if err := db.Create(&configs).Error; err != nil {
         log.Fatalf("❌ Failed to seed system_configs: %v", err)
