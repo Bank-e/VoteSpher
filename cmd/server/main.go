@@ -28,6 +28,8 @@ func main() {
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
 	// ตัวอย่าง (ถ้าคุณมี package auth/info):
+	http.HandleFunc("/dev/mock-token", auth.MockTokenHandler()) // สำหรับสร้าง JWT token จำลอง (ใช้ในการทดสอบ)
+	
 	// mux.HandleFunc("/v1/voter/verify", auth.VerifyVoterHandler(db))
 	// mux.HandleFunc("/v1/candidates", info.GetCandidatesHandler(db))
 
