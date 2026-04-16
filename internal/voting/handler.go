@@ -21,7 +21,6 @@ func SubmitBallotHandler(db *gorm.DB) http.HandlerFunc {
 		}
 
 		// 2. ดึงค่าจาก Context (สมมติว่าคุณมี jwt_middleware.go คอยเช็คและยัดค่าใส่ Request Context ไว้แล้ว)
-		// *หมายเหตุ: ตรงนี้ต้องปรับให้ตรงกับวิธีที่คุณดึง Claims ใน Middleware นะครับ
 		ctxVoterID := r.Context().Value("voter_id")
 		ctxAreaID := r.Context().Value("area_id")
 
@@ -31,7 +30,7 @@ func SubmitBallotHandler(db *gorm.DB) http.HandlerFunc {
 		}
 
 		// แปลง Type ให้ถูกต้อง (ขึ้นอยู่กับว่า Middleware ยัดมาเป็น float64 หรือ uint)
-		voterID := uint(ctxVoterID.(float64)) // หรือแคสต์ตาม type จริงของคุณ
+		voterID := uint(ctxVoterID.(float64))
 		areaID := uint(ctxAreaID.(float64))
 
 		// 3. ส่งไปให้ Service จัดการ

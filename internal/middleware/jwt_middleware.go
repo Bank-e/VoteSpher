@@ -24,8 +24,10 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// ฝังข้อมูล Role ลงใน Context ของ Request เพื่อส่งให้ด่านต่อไปใช้
+		// ฝังข้อมูลทั้งหมดที่จำเป็นลงใน Context เพื่อให้ Handler ตัวต่อไปใช้ได้
 		ctx := context.WithValue(r.Context(), "role", claims.Role)
+		ctx = context.WithValue(ctx, "voter_id", claims.VoterID)
+		ctx = context.WithValue(ctx, "area_id", claims.AreaID)
 		
 		// เรียกใช้ Handler ตัวต่อไป (หรือ Middleware ตัวต่อไป) พร้อมส่ง Context ใหม่ไป
 		next(w, r.WithContext(ctx))
