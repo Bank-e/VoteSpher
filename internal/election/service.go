@@ -17,7 +17,7 @@ func UpdateElectionConfig(db *gorm.DB, req UpdateConfigRequest) (*ConfigResponse
 
 	// คืนค่า config ที่อัปเดตแล้ว
 	return &ConfigResponse{
-		ConfigID:  cfg.ConfigID,
+		ConfigID:  cfg.ID,
 		Status:    cfg.Status,
 		StartTime: cfg.StartTime,
 		EndTime:   cfg.EndTime,

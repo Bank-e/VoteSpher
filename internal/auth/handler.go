@@ -1,12 +1,12 @@
 package auth
 
 import (
-	"encoding/json"
 	"net/http"
+	"os"
 
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"os"
 	"votespher/pkg"
 )
 
@@ -16,29 +16,19 @@ type MockTokenRequest struct {
 	Role    string `json:"role"`
 }
 
-func MockTokenHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		// 2. บังคับรับเฉพาะ POST Method (ถ้าใช้ Router ที่ดัก Method ให้อยู่แล้ว เอาออกได้ครับ)
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Method Not Allowed"})
-			return
-		}
-
+// POST /dev/mock-token
+func MockTokenHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. Parse Request Body ด้วย Gin
 		var req MockTokenRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			// 3. ปรับ Error ให้คืนค่าเป็น JSON
-			json.NewEncoder(w).Encode(map[string]string{"error": "รูปแบบข้อมูลไม่ถูกต้อง"})
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบข้อมูลไม่ถูกต้อง"})
 			return
 		}
 
-		// 4. Validate ข้อมูลขั้นต่ำ
+		// 2. Validate ข้อมูลขั้นต่ำ
 		if req.VoterID == 0 || req.AreaID == 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "กรุณาระบุ voter_id และ area_id (ต้องมากกว่า 0)"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ voter_id และ area_id (ต้องมากกว่า 0)"})
 			return
 		}
 
@@ -53,8 +43,7 @@ func MockTokenHandler() http.HandlerFunc {
 
 		token, err := pkg.GenerateToken(req.VoterID, req.AreaID, req.Role, secretKey)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "สร้าง Token ไม่สำเร็จ: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง Token ไม่สำเร็จ: " + err.Error()})
 			return
 		}
 
@@ -65,37 +54,37 @@ func MockTokenHandler() http.HandlerFunc {
 			"mock_data":    req,
 		}
 
-		json.NewEncoder(w).Encode(response)
+		// 3. ส่ง Response กลับ
+		c.JSON(http.StatusOK, response)
 	}
 }
 
 // POST /voter/otp-confirm
 // รับ otp_code และ ref_code แล้วยืนยัน OTP
 // ถ้าถูกต้องจะคืน JWT token กลับไป
-func OTPConfirmHandler(db *gorm.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		// อ่าน request body
-		var req OTPConfirmRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "request body ไม่ถูกต้อง", http.StatusBadRequest)
+func OTPConfirmHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. อ่าน request body
+		var req OTPConfirmRequest // สมมติว่ามี struct นี้ประกาศไว้ที่อื่นใน package
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "request body ไม่ถูกต้อง"})
 			return
 		}
 
-		// ตรวจว่า field ครบไหม
+		// 2. ตรวจว่า field ครบไหม
 		if req.OTPCode == "" || req.RefCode == "" {
-			http.Error(w, "กรุณาระบุ otp_code และ ref_code", http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ otp_code และ ref_code"})
 			return
 		}
 
-		// ส่งไปให้ service ยืนยัน OTP
+		// 3. ส่งไปให้ service ยืนยัน OTP
 		result, err := ConfirmOTP(db, req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
-		json.NewEncoder(w).Encode(OTPConfirmResponse{Token: result.Token})
+		// 4. ส่ง Token กลับไป
+		c.JSON(http.StatusOK, OTPConfirmResponse{Token: result.Token})
 	}
 }
