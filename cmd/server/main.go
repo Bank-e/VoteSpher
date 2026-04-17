@@ -1,12 +1,16 @@
 package main
 
 import (
-	// "log"
-	// "net/http"
+	"log"
+	"os"
 	"votespher/config"
-	// "votespher/internal/election"
-	// "votespher/internal/middleware"
+	"votespher/internal/auth"
+	"votespher/internal/election"
+	"votespher/internal/voting"
+	"votespher/internal/middleware"
 	"votespher/migration"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -14,48 +18,50 @@ func main() {
 	config.LoadEnv()
 	db := config.ConnectDB()
 
-	// 2. รัน migration ทุกครั้งที่ start server
-	migration.Run(db)
-
-	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ) เพื่อให้มีข้อมูล ใช้ในกรณีไม่ใช้ cloud
-	// migration.SeedData(db)
-
-	/*
-	// 4. สร้าง HTTP Router (ServeMux)
-	mux := http.NewServeMux()
+	// 2. ตรวจ flag ก่อน run migration
+	if os.Getenv("RUN_MIGRATION") == "true" {
+		migration.Run(db)
+		return
+	}
+	
+	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ)
+	if os.Getenv("RUN_SEED") == "true" {
+		migration.SeedData(db)
+		return
+	}
+	
+	// 4. สร้าง HTTP Router ด้วย Gin
+	r := gin.Default()
 
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
-	// ตัวอย่าง (ถ้าคุณมี package auth/info):
-	// mux.HandleFunc("/v1/voter/verify", auth.VerifyVoterHandler(db))
-	// mux.HandleFunc("/v1/candidates", info.GetCandidatesHandler(db))
+	
+	// แก้เป็น r.POST และเอา gin.WrapH ออก เพราะเป็น Gin Handler แล้ว
+	r.POST("/dev/mock-token", auth.MockTokenHandler()) 
+	
+	// r.GET("/v1/voter/verify", auth.VerifyVoterHandler(db))
+	// r.GET("/v1/candidates", info.GetCandidatesHandler(db))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
 	// ==========================================
-	// ตัวอย่างการครอบเฉพาะ RequireAuth:
-	// ballotSubmitHandler := middleware.RequireAuth(voting.SubmitBallotHandler(db))
-	// mux.HandleFunc("/v1/ballot/submit", ballotSubmitHandler)
+	protected := r.Group("/")
+	protected.Use(middleware.RequireAuth())
+	{
+		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
+	}
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
-	// นำ Handler หลักมาครอบด้วย RequireRole และ RequireAuth ตามลำดับ 
-	configHandler := election.UpdateConfigHandler(db)
-	protectedAdminHandler := middleware.RequireAuth(
-		middleware.RequireRole("admin", configHandler),
-	)
-	
-	// ลงทะเบียน Route สำหรับแก้ไข Config
-	mux.HandleFunc("/election/config", protectedAdminHandler)
-
-	// ==========================================
-	// 5. Start Server
-	// ==========================================
-	log.Println("Server is running on port 8080...")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	admin := r.Group("/")
+	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
+	{
+		admin.PATCH("/election/config", election.UpdateConfigHandler(db)) // ใช้ PATCH หรือ PUT ตามที่คุณออกแบบไว้
 	}
-		*/
+
+	// Start Server
+	log.Println("Server is running on port 8080...")
+	r.Run(":8080")
 }

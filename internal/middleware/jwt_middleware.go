@@ -1,50 +1,55 @@
 package middleware
 
 import (
-	"context"
-	"net/http"
+	"net/http" // net/http สำหรับ Status Code
 	"os"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 	"votespher/pkg"
 )
 
 // 1. ด่านตรวจ Token
-func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "กรุณา login ก่อน", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error_code": "UNAUTHORIZED",
+				"message":    "กรุณา login ก่อน",
+			})
 			return
 		}
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := pkg.ValidateToken(tokenStr, os.Getenv("JWT_SECRET_KEY"))
 		if err != nil {
-			http.Error(w, "token ไม่ถูกต้องหรือหมดอายุ", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error_code": "UNAUTHORIZED",
+				"message":    "token ไม่ถูกต้องหรือหมดอายุ",
+			})
 			return
 		}
 
-		// ฝังข้อมูล Role ลงใน Context ของ Request เพื่อส่งให้ด่านต่อไปใช้
-		ctx := context.WithValue(r.Context(), "role", claims.Role)
-		
-		// เรียกใช้ Handler ตัวต่อไป (หรือ Middleware ตัวต่อไป) พร้อมส่ง Context ใหม่ไป
-		next(w, r.WithContext(ctx))
+		// เก็บ claims ลง Gin context แทน r.Context()
+		c.Set("role", claims.Role)
+		c.Set("voter_id", claims.VoterID)
+		c.Set("area_id", claims.AreaID)
+		c.Next()
 	}
 }
 
 // 2. ด่านตรวจสิทธิ์
-func RequireRole(requiredRole string, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// ดึง role ที่ RequireAuth ฝังไว้
-		userRole := r.Context().Value("role")
-
-		// ถ้าสิทธิ์ไม่ตรง ให้เตะออก
+func RequireRole(requiredRole string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, _ := c.Get("role")
 		if userRole != requiredRole {
-			http.Error(w, "ไม่มีสิทธิ์เข้าถึง", http.StatusForbidden)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error_code": "FORBIDDEN",
+				"message":    "ไม่มีสิทธิ์เข้าถึง",
+			})
 			return
 		}
-
-		// ถ้าสิทธิ์ตรง ให้ไปต่อที่ Handler หลัก
-		next(w, r)
+		c.Next()
 	}
 }
