@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"votespher/config"
+	"os"
 
 	"votespher/internal/auth"
 	// "votespher/internal/election"
@@ -18,8 +19,13 @@ func main() {
 	config.LoadEnv()
 	db := config.ConnectDB()
 
-	// 2. รัน migration ทุกครั้งที่ start server
-	migration.Run(db)
+	// 2. ตรวจ flag ก่อน run migration
+    if os.Getenv("RUN_MIGRATION") == "true" {
+        log.Println("Running migrations...")
+        migration.Run(db)
+        log.Println("Migration complete. Exiting.")
+        return // หยุดแค่นี้ ไม่ต้อง start server
+    }
 
 	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ) เพื่อให้มีข้อมูล ใช้ในกรณีไม่ใช้ cloud
 	// migration.SeedData(db)
