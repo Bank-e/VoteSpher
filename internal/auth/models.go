@@ -27,3 +27,13 @@ type OTPConfirmRequest struct {
 type OTPConfirmResponse struct {
 	Token string `json:"token"` // JWT token
 }
+
+// POST /voter/otp-request
+type OTPRequestRequest struct {
+	VoterID uint `json:"voter_id" binding:"required"`
+}
+
+type OTPRequestResponse struct {
+	RefCode string `json:"ref_code"`
+	OTPCode string `json:"otp_code"` // คืนให้เพื่อใช้ทดสอบ (ในระบบจริงจะส่ง SMS)
+}
