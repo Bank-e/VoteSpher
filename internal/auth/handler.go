@@ -3,10 +3,12 @@ package auth
 import (
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"votespher/internal/models"
 	"votespher/pkg"
 )
 
@@ -86,5 +88,81 @@ func OTPConfirmHandler(db *gorm.DB) gin.HandlerFunc {
 
 		// 4. ส่ง Token กลับไป
 		c.JSON(http.StatusOK, OTPConfirmResponse{Token: result.Token})
+	}
+}
+
+// POST /voter/verify
+// ฟังก์ชันสำหรับตรวจสอบสิทธิ์ผู้เลือกตั้ง
+func VerifyVoterHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req VerifyVoterRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง (ต้องการ citizen_id)"})
+			return
+		}
+
+		// เรียกใช้ฟังก์ชัน Hash ที่เพื่อนทำไว้ใน service.go
+		hashedID := generateCitizenIDHash(req.CitizenID)
+
+		// เรียกใช้ฟังก์ชันหาข้อมูลที่เราเพิ่มไว้ใน repository.go
+		voter, err := FindVoterByCitizenIDHash(db, hashedID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบผู้มีสิทธิ์เลือกตั้ง"})
+			return
+		}
+
+		// เตรียมข้อมูลส่งกลับตามโครงสร้าง VerifyVoterResponse ใน models.go
+		res := VerifyVoterResponse{
+			VoterID: voter.ID,
+			VoterInfo: VoterInfo{
+				Name:     "ข้อมูลปกปิด",
+				AreaID:   voter.AreaID,
+				AreaName: voter.Area.AreaName,
+				Province: "ไม่ระบุจังหวัด",
+				IsVoted:  voter.IsVoted,
+			},
+		}
+		c.JSON(http.StatusOK, res)
+	}
+}
+
+// POST /voter/otp-request
+// ฟังก์ชันสำหรับขอรหัส OTP
+func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req OTPRequestRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ต้องการ voter_id"})
+			return
+		}
+
+		// ตรวจสอบก่อนว่ามี Voter นี้จริงไหม
+		_, err := FindVoterByID(db, req.VoterID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบรหัสผู้มีสิทธิ์โหวตนี้"})
+			return
+		}
+
+		// สุ่มรหัสจากฟังก์ชันที่เราเพิ่มไว้ใน service.go
+		otpCode, _ := generateRandomOTP()
+		refCode, _ := generateRefCode()
+
+		// บันทึกลงฐานข้อมูล (ตาราง otps)
+		newOTP := models.OTP{
+			VoterID:   req.VoterID,
+			OTPCode:   otpCode,
+			RefCode:   refCode,
+			ExpiresAt: time.Now().Add(5 * time.Minute),
+		}
+
+		if err := db.Create(&newOTP).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
+			return
+		}
+
+		c.JSON(http.StatusOK, OTPRequestResponse{
+			RefCode: refCode,
+			OTPCode: otpCode,
+		})
 	}
 }
