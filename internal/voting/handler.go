@@ -3,6 +3,7 @@ package voting
 import (
 	"net/http"
 	"strings"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -71,6 +72,49 @@ func SubmitBallotHandler(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusCreated, gin.H{
 			"status":  "success",
 			"message": "บันทึกคะแนนสำเร็จ",
+		})
+	}
+}
+
+// GET /ballot/status
+// ตรวจสอบสถานะระบบและสถานะการลงคะแนนของผู้ใช้งาน
+func GetBallotStatusHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		
+		// 1. ดึง VoterID ออกจาก Token
+		ctxVoterID, exists := c.Get("voter_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "ไม่พบข้อมูลยืนยันตัวตน"})
+			return
+		}
+
+		voterID, ok := ctxVoterID.(uint)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ข้อมูลยืนยันตัวตนไม่ถูกต้อง"})
+			return
+		}
+
+		// 2. เรียกใช้งาน Service
+		result, err := GetBallotStatusService(db, voterID)
+		if err != nil {
+			statusCode := http.StatusInternalServerError
+			// จัดการ Status Code ตาม Error Message (ถ้ามี)
+			if strings.Contains(err.Error(), "404") {
+				statusCode = http.StatusNotFound
+			}
+			
+			c.JSON(statusCode, gin.H{
+				"status":  "error",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		// 3. ห่อข้อมูลตอบกลับแบบสวยงามให้ Frontend นำไปใช้ง่ายๆ
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "ดึงข้อมูลสถานะสำเร็จ",
+			"data":    result,
 		})
 	}
 }

@@ -51,3 +51,37 @@ func SubmitVoteService(db *gorm.DB, voterID uint, areaID uint, req SubmitBallotR
 	// 4. สั่งให้ Repository ทำการบันทึกข้อมูลแบบ Transaction
 	return ExecuteVoteTransaction(db, voterID, voteRecord)
 }
+
+// GetBallotStatusService รวบรวมข้อมูลสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
+func GetBallotStatusService(db *gorm.DB, voterID uint) (*BallotStatusResponse, error) {
+	
+	// 1. ตรวจสอบสถานะว่าโหวตหรือยัง
+	isVoted, err := CheckUserHasVoted(db, voterID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("404: ไม่พบข้อมูลผู้ใช้งานในระบบ")
+		}
+		return nil, errors.New("500: ไม่สามารถตรวจสอบประวัติการลงคะแนนของผู้ใช้ได้")
+	}
+
+	// 2. ตรวจสอบการตั้งค่าระบบเลือกตั้ง
+	config, err := GetActiveElectionConfig(db)
+	if err != nil {
+		// กรณีที่ฐานข้อมูลเพิ่งสร้างใหม่ ยังไม่มีแอดมินมาตั้งค่าใดๆ เลย
+		// ให้ถือว่าระบบอยู่ในสถานะ "เตรียมการ (PREPARE)"
+		return &BallotStatusResponse{
+			ElectionStatus: "PREPARE",
+			ServerTime:     time.Now(),
+			IsVoted:       isVoted,
+		}, nil
+	}
+
+	// 3. ประกอบร่างข้อมูล (BFF Pattern) เพื่อส่งกลับไปให้ด่านหน้า
+	return &BallotStatusResponse{
+		ElectionStatus: config.Status,
+		StartTime:      config.StartTime,
+		EndTime:        config.EndTime,
+		ServerTime:     time.Now(), // ประทับตราเวลา Server ณ วินาทีนี้
+		IsVoted:        isVoted,
+	}, nil
+}
