@@ -49,3 +49,24 @@ func ExecuteVoteTransaction(db *gorm.DB, voterID uint, voteRecord models.Vote) e
 		return nil
 	})
 }
+
+// GetActiveElectionConfig ค้นหาการตั้งค่าระบบที่กำลังใช้งานอยู่
+func GetActiveElectionConfig(db *gorm.DB) (*models.SystemConfig, error) {
+	var config models.SystemConfig
+	// หาแถวที่ is_active เป็น true (หรือ 1)
+	if err := db.Where("is_active = ?", true).First(&config).Error; err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// CheckUserHasVoted ตรวจสอบว่าผู้ใช้งานคนนี้เคยลงคะแนนไปแล้วหรือยัง
+func CheckUserHasVoted(db *gorm.DB, voterID uint) (bool, error) {
+	var voter models.Voter
+
+	// ส่ง ID เข้าไปใน First โดยตรง GORM จะใช้ Primary Key ให้เอง
+	if err := db.Select("is_voted").First(&voter, voterID).Error; err != nil {
+		return false, err
+	}
+	return voter.IsVoted, nil
+}
