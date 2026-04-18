@@ -2,9 +2,12 @@ package auth
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/big"
 	"os"
 	"votespher/pkg"
 
@@ -57,4 +60,24 @@ func generateCitizenIDHash(citizenID string) string {
 	h := hmac.New(sha256.New, secretKey)
 	h.Write([]byte(citizenID))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// สุ่มเลข 6 หลัก สำหรับ OTP
+func generateRandomOTP() (string, error) {
+	max := big.NewInt(1000000)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+// สุ่มตัวอักษร 6 ตัว สำหรับ Ref Code
+func generateRefCode() (string, error) {
+	b := make([]byte, 3)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

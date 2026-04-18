@@ -6,8 +6,8 @@ import (
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
-	"votespher/internal/voting"
 	"votespher/internal/middleware"
+	"votespher/internal/voting"
 	"votespher/migration"
 
 	"github.com/gin-gonic/gin"
@@ -23,25 +23,29 @@ func main() {
 		migration.Run(db)
 		return
 	}
-	
+
 	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ)
 	if os.Getenv("RUN_SEED") == "true" {
 		migration.SeedData(db)
 		return
 	}
-	
+
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
-	
+
 	// แก้เป็น r.POST และเอา gin.WrapH ออก เพราะเป็น Gin Handler แล้ว
-	r.POST("/dev/mock-token", auth.MockTokenHandler()) 
-	
-	// r.GET("/v1/voter/verify", auth.VerifyVoterHandler(db))
-	// r.GET("/v1/candidates", info.GetCandidatesHandler(db))
+	r.POST("/dev/mock-token", auth.MockTokenHandler())
+
+	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
+	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
+	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
+
+	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
+	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
