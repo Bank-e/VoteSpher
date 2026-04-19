@@ -20,3 +20,17 @@ func GetProvinceAreaResultRepository(db *gorm.DB, provinceName string, areaID st
 		Message:      area.AreaName, // ใช้ของจริงจาก DB
 	}, nil
 }
+
+func GetVoteResultByArea(db *gorm.DB, areaID string) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+
+	err := db.
+		Table("votes").
+		Select("parties.party_name, COUNT(*) as total").
+		Joins("JOIN parties ON votes.party_id = parties.party_id").
+		Where("votes.area_id = ?", areaID).
+		Group("parties.party_name").
+		Find(&results).Error
+
+	return results, err
+}
