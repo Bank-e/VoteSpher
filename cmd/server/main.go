@@ -8,6 +8,7 @@ import (
 	"votespher/internal/election"
 	"votespher/internal/middleware"
 	"votespher/internal/voting"
+	"votespher/internal/info"
 	"votespher/migration"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,10 @@ func main() {
 
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
+
+	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
+	
+	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
