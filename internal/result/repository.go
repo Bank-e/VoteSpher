@@ -22,6 +22,11 @@ func GetProvinceAreaResultRepository(db *gorm.DB, provinceName string, areaID st
 }
 
 func GetVoteResultByArea(db *gorm.DB, areaID string) ([]map[string]interface{}, error) {
+	var area models.Area
+	if err := db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
+		return nil, err
+	}
+
 	var results []map[string]interface{}
 
 	err := db.
