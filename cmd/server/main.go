@@ -6,9 +6,10 @@ import (
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
-	"votespher/internal/middleware"
-	"votespher/internal/voting"
 	"votespher/internal/info"
+	"votespher/internal/middleware"
+	"votespher/internal/result"
+	"votespher/internal/voting"
 	"votespher/migration"
 
 	"github.com/gin-gonic/gin"
@@ -49,8 +50,10 @@ func main() {
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
 	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
-	
+
 	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
+
+	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
@@ -59,7 +62,7 @@ func main() {
 	protected.Use(middleware.RequireAuth())
 	{
 		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
-		
+
 		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db)) // ฟังก์ชันนี้จะรวมสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
 	}
 
