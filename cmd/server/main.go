@@ -8,6 +8,7 @@ import (
 	"votespher/internal/election"
 	"votespher/internal/info"
 	"votespher/internal/middleware"
+	"votespher/internal/realtime"
 	"votespher/internal/result"
 	"votespher/internal/voting"
 	"votespher/migration"
@@ -54,6 +55,10 @@ func main() {
 	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
 
 	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
+	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
+	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
+	//เพิ่ทม API สำหรับผลโหวตแบบเรียลไทม์แยกตามเขต
+	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
