@@ -26,7 +26,7 @@ func GetVoteResultByAreaHandler(db *gorm.DB) gin.HandlerFunc {
 func GetAllAreasVotesHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		results, err := GetAllAreasVotes(db)
+		rows, err := GetAllAreasVotes(db)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -34,6 +34,8 @@ func GetAllAreasVotesHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, results)
+		response := BuildResponse(rows)
+
+		c.JSON(http.StatusOK, response)
 	}
 }
