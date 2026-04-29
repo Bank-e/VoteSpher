@@ -35,6 +35,11 @@ func main() {
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
+	// Refactor Layered Architecture
+	voteRepo := voting.NewVotingRepository(db)
+    voteService := voting.NewVotingService(voteRepo)
+    voteHandler := voting.NewVotingHandler(voteService)
+
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
