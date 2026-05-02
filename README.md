@@ -15,8 +15,8 @@
 # <a href="https://github.com/Chayada23">ชญาดา ธรรมวิชัย 6609650244 (น้ำฝน)</a>
  * GET /results/realtime
 
-# <a href="https://github.com/naemdev">รัตนากร วังคีรี 6409650295 (แนม)
- * GET- /results/provinces/{provinces_name}/areas/{area_id}
+# <a href="https://github.com/naemdev">รัตนากร วังคีรี 6409650295 (แนม)</a>
+ * GET /results/area/{id} 
 
 # <a href="https://github.com/Xagatech">ภีมพัฒน์ จิราวัฒวาณิชย์ 6609650566 (เซีย)</a>
  * POST- /voter/otp-confirm
