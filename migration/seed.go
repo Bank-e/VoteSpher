@@ -50,17 +50,28 @@ func SeedData(db *gorm.DB) {
     db.Exec("TRUNCATE TABLE candidates;")
     db.Exec("TRUNCATE TABLE parties;")
     db.Exec("TRUNCATE TABLE areas;")
+    db.Exec("TRUNCATE TABLE provinces;")
     db.Exec("SET FOREIGN_KEY_CHECKS = 1;")
 
     log.Println("🌱 Seeding Mock Data...")
 
+    provinces := []models.Province{
+        {ProvinceName: "กรุงเทพมหานคร"},
+        {ProvinceName: "เชียงใหม่"},
+        {ProvinceName: "ขอนแก่น"},
+        {ProvinceName: "ชลบุรี"},
+    }
+    if err := db.Create(&provinces).Error; err != nil {
+        log.Fatalf("❌ Failed to seed provinces: %v", err)
+    }
+
     // 1. Areas
     areas := []models.Area{
-        {AreaName: "กรุงเทพมหานคร เขต 1"},
-        {AreaName: "กรุงเทพมหานคร เขต 2"},
-        {AreaName: "เชียงใหม่ เขต 1"},
-        {AreaName: "ขอนแก่น เขต 1"},
-        {AreaName: "ชลบุรี เขต 1"},
+        {AreaName: "เขต 1", ProvinceID: provinces[0].ID}, // กรุงเทพฯ
+        {AreaName: "เขต 2", ProvinceID: provinces[0].ID}, // กรุงเทพฯ
+        {AreaName: "เขต 1", ProvinceID: provinces[1].ID}, // เชียงใหม่
+        {AreaName: "เขต 1", ProvinceID: provinces[2].ID}, // ขอนแก่น
+        {AreaName: "เขต 1", ProvinceID: provinces[3].ID}, // ชลบุรี
     }
     if err := db.Create(&areas).Error; err != nil {
         log.Fatalf("❌ Failed to seed areas: %v", err)
@@ -109,7 +120,7 @@ func SeedData(db *gorm.DB) {
         {CitizenIDHash: "342dcd58481f26e0109717a0930621f769707e9091da3697a2312c8973f1b130", AreaID: areas[0].ID, PhoneNumber: "0811111111", IsVoted: true, VotedAt: timePtr("2026-04-14 08:30:00")},
         {CitizenIDHash: "59194e4bf88deb95b5b4e6eb6b09463bdc1592aa13c943f470a148b98974e8ab", AreaID: areas[0].ID, PhoneNumber: "0812222222", IsVoted: true, VotedAt: timePtr("2026-04-14 09:15:00")},
         {CitizenIDHash: "02cde367f2cdd9210f7edb4ddf486032067f7067ac84891a22efa7d9b77de8af", AreaID: areas[0].ID, PhoneNumber: "0813333333", IsVoted: true, VotedAt: timePtr("2026-04-14 10:05:00")},
-        {CitizenIDHash: "a69e7a3ee0ac644de72323c3932c528921fdf8319630470f753dbcdd09e7becb", AreaID: areas[0].ID, PhoneNumber: "0814444444", IsVoted: false, VotedAt: nil},
+        {CitizenIDHash: "a69e7a3ee0ac644de72323c3932c528921fdf8319630470f753dbcdd09e7becb", AreaID: areas[0].ID, PhoneNumber: "0929400592", IsVoted: false, VotedAt: nil},
         {CitizenIDHash: "5aba4c653982bfe235c2213b754348b50e8f2d61be0010a6923f18032102dc15", AreaID: areas[1].ID, PhoneNumber: "0821111111", IsVoted: true, VotedAt: timePtr("2026-04-14 08:45:00")},
         {CitizenIDHash: "051b71582088500660bc221f9b2c3971820a798f524a69bade02a24a95e5417e", AreaID: areas[1].ID, PhoneNumber: "0822222222", IsVoted: true, VotedAt: timePtr("2026-04-14 11:20:00")},
         {CitizenIDHash: "0afe2c335af6c6c40d6e93b905031728617bc385e16bea3b81b26fb887f76ca1", AreaID: areas[1].ID, PhoneNumber: "0823333333", IsVoted: true, VotedAt: timePtr("2026-04-14 13:10:00")},
@@ -135,26 +146,26 @@ func SeedData(db *gorm.DB) {
     // 4.5 OTPs
     // ==========================================
     otps := []models.OTP{
-        {VoterID: voters[0].ID, OTPCode: "123456", RefCode: "ABCD", ExpiresAt: parseTime("2026-04-14 08:35:00"), IsUsed: true},
-        {VoterID: voters[1].ID, OTPCode: "234567", RefCode: "EFGH", ExpiresAt: parseTime("2026-04-14 09:20:00"), IsUsed: true},
-        {VoterID: voters[2].ID, OTPCode: "345678", RefCode: "IJKL", ExpiresAt: parseTime("2026-04-14 10:10:00"), IsUsed: true},
-        {VoterID: voters[3].ID, OTPCode: "456789", RefCode: "MNOP", ExpiresAt: parseTime("2026-04-14 11:00:00"), IsUsed: false},
-        {VoterID: voters[4].ID, OTPCode: "567890", RefCode: "QRST", ExpiresAt: parseTime("2026-04-14 08:50:00"), IsUsed: true},
-        {VoterID: voters[5].ID, OTPCode: "678901", RefCode: "UVWX", ExpiresAt: parseTime("2026-04-14 11:25:00"), IsUsed: true},
-        {VoterID: voters[6].ID, OTPCode: "789012", RefCode: "YZAB", ExpiresAt: parseTime("2026-04-14 13:15:00"), IsUsed: true},
-        {VoterID: voters[7].ID, OTPCode: "890123", RefCode: "CDEF", ExpiresAt: parseTime("2026-04-14 14:05:00"), IsUsed: true},
-        {VoterID: voters[8].ID, OTPCode: "901234", RefCode: "GHIJ", ExpiresAt: parseTime("2026-04-14 09:05:00"), IsUsed: true},
-        {VoterID: voters[9].ID, OTPCode: "012345", RefCode: "KLMN", ExpiresAt: parseTime("2026-04-14 09:35:00"), IsUsed: true},
-        {VoterID: voters[10].ID, OTPCode: "112233", RefCode: "OPQR", ExpiresAt: parseTime("2026-04-14 10:00:00"), IsUsed: false},
-        {VoterID: voters[11].ID, OTPCode: "223344", RefCode: "STUV", ExpiresAt: parseTime("2026-04-14 10:50:00"), IsUsed: true},
-        {VoterID: voters[12].ID, OTPCode: "334455", RefCode: "WXYZ", ExpiresAt: parseTime("2026-04-14 08:15:00"), IsUsed: true},
-        {VoterID: voters[13].ID, OTPCode: "445566", RefCode: "ABCD", ExpiresAt: parseTime("2026-04-14 12:35:00"), IsUsed: true},
-        {VoterID: voters[14].ID, OTPCode: "556677", RefCode: "EFGH", ExpiresAt: parseTime("2026-04-14 15:25:00"), IsUsed: true},
-        {VoterID: voters[15].ID, OTPCode: "667788", RefCode: "IJKL", ExpiresAt: parseTime("2026-04-14 16:10:00"), IsUsed: true},
-        {VoterID: voters[16].ID, OTPCode: "778899", RefCode: "MNOP", ExpiresAt: parseTime("2026-04-14 08:55:00"), IsUsed: true},
-        {VoterID: voters[17].ID, OTPCode: "889900", RefCode: "QRST", ExpiresAt: parseTime("2026-04-14 09:45:00"), IsUsed: true},
-        {VoterID: voters[18].ID, OTPCode: "990011", RefCode: "UVWX", ExpiresAt: parseTime("2026-04-14 10:30:00"), IsUsed: false},
-        {VoterID: voters[19].ID, OTPCode: "001122", RefCode: "YZAB", ExpiresAt: parseTime("2026-04-14 11:20:00"), IsUsed: true}, // ปรับ OTP เป็น 6 หลักให้สมบูรณ์
+        {VoterID: voters[0].ID, OTPCode: "123456", RefCode: "ABCD", ExpiresAt: parseTime("2026-06-14 08:35:00"), IsUsed: true},
+        {VoterID: voters[1].ID, OTPCode: "234567", RefCode: "EFGH", ExpiresAt: parseTime("2026-06-14 09:20:00"), IsUsed: true},
+        {VoterID: voters[2].ID, OTPCode: "345678", RefCode: "IJKL", ExpiresAt: parseTime("2026-06-14 10:10:00"), IsUsed: true},
+        {VoterID: voters[3].ID, OTPCode: "456789", RefCode: "MNOP", ExpiresAt: parseTime("2026-06-14 11:00:00"), IsUsed: false},
+        {VoterID: voters[4].ID, OTPCode: "567890", RefCode: "QRST", ExpiresAt: parseTime("2026-06-14 08:50:00"), IsUsed: true},
+        {VoterID: voters[5].ID, OTPCode: "678901", RefCode: "UVWX", ExpiresAt: parseTime("2026-06-14 11:25:00"), IsUsed: true},
+        {VoterID: voters[6].ID, OTPCode: "789012", RefCode: "YZAB", ExpiresAt: parseTime("2026-06-14 13:15:00"), IsUsed: true},
+        {VoterID: voters[7].ID, OTPCode: "890123", RefCode: "CDEF", ExpiresAt: parseTime("2026-06-14 14:05:00"), IsUsed: true},
+        {VoterID: voters[8].ID, OTPCode: "901234", RefCode: "GHIJ", ExpiresAt: parseTime("2026-06-14 09:05:00"), IsUsed: true},
+        {VoterID: voters[9].ID, OTPCode: "012345", RefCode: "KLMN", ExpiresAt: parseTime("2026-06-14 09:35:00"), IsUsed: true},
+        {VoterID: voters[10].ID, OTPCode: "112233", RefCode: "OPQR", ExpiresAt: parseTime("2026-06-14 10:00:00"), IsUsed: false},
+        {VoterID: voters[11].ID, OTPCode: "223344", RefCode: "STUV", ExpiresAt: parseTime("2026-06-14 10:50:00"), IsUsed: true},
+        {VoterID: voters[12].ID, OTPCode: "334455", RefCode: "WXYZ", ExpiresAt: parseTime("2026-06-14 08:15:00"), IsUsed: true},
+        {VoterID: voters[13].ID, OTPCode: "445566", RefCode: "ABCD", ExpiresAt: parseTime("2026-06-14 12:35:00"), IsUsed: true},
+        {VoterID: voters[14].ID, OTPCode: "556677", RefCode: "EFGH", ExpiresAt: parseTime("2026-06-14 15:25:00"), IsUsed: true},
+        {VoterID: voters[15].ID, OTPCode: "667788", RefCode: "IJKL", ExpiresAt: parseTime("2026-06-14 16:10:00"), IsUsed: true},
+        {VoterID: voters[16].ID, OTPCode: "778899", RefCode: "MNOP", ExpiresAt: parseTime("2026-06-14 08:55:00"), IsUsed: true},
+        {VoterID: voters[17].ID, OTPCode: "889900", RefCode: "QRST", ExpiresAt: parseTime("2026-06-14 09:45:00"), IsUsed: true},
+        {VoterID: voters[18].ID, OTPCode: "990011", RefCode: "UVWX", ExpiresAt: parseTime("2026-06-14 10:30:00"), IsUsed: false},
+        {VoterID: voters[19].ID, OTPCode: "001122", RefCode: "YZAB", ExpiresAt: parseTime("2026-06-14 11:20:00"), IsUsed: true}, // ปรับ OTP เป็น 6 หลักให้สมบูรณ์
     }
     if err := db.Create(&otps).Error; err != nil {
         log.Fatalf("❌ Failed to seed otps: %v", err)
