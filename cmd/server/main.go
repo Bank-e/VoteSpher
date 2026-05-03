@@ -36,6 +36,11 @@ func main() {
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
+	// Refactor Layered Architecture
+	voteRepo := voting.NewVotingRepository(db)
+    voteService := voting.NewVotingService(voteRepo)
+    voteHandler := voting.NewVotingHandler(voteService)
+
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
@@ -64,12 +69,11 @@ func main() {
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
 	// ==========================================
 	protected := r.Group("/")
-	protected.Use(middleware.RequireAuth())
-	{
-		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
-
-		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db)) // ฟังก์ชันนี้จะรวมสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
-	}
+    protected.Use(middleware.RequireAuth())
+    {
+        protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+        protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
+    }
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
