@@ -3,6 +3,7 @@ package info
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"gorm.io/gorm"
 )
@@ -12,9 +13,15 @@ func GetCandidatesHandler(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		areaID := r.URL.Query().Get("area_id")
-		if areaID == "" {
+		areaIDStr := r.URL.Query().Get("area_id")
+		if areaIDStr == "" {
 			http.Error(w, "area_id is required", http.StatusBadRequest)
+			return
+		}
+
+		areaID, err := strconv.Atoi(areaIDStr)
+		if err != nil {
+			http.Error(w, "invalid area_id", http.StatusBadRequest)
 			return
 		}
 

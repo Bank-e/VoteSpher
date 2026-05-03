@@ -2,7 +2,7 @@ package info
 
 import "gorm.io/gorm"
 
-func GetCandidates(db *gorm.DB, areaID string) ([]Candidate, error) {
+func GetCandidates(db *gorm.DB, areaID int) ([]Candidate, error) {
 	var result []Candidate
 
 	err := db.Table("candidates").
