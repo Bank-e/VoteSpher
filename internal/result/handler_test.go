@@ -16,7 +16,7 @@ import (
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
@@ -189,5 +189,83 @@ func TestGetProvinceAreaResultHandler_Success(t *testing.T) {
 	}
 	if results["พรรคกล้าธรรม"] != 1 {
 		t.Fatalf("expected พรรคกล้าธรรม total = 1, got %v", results["พรรคกล้าธรรม"])
+	}
+}
+func TestGetProvinceAreaResultHandler_ProvinceMismatchButAreaExists(t *testing.T) {
+	db := setupTestDB(t)
+	seedTestData(t, db)
+
+	r := setupRouter(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/results/provinces/unknown/areas/1", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp) != 3 {
+		t.Fatalf("expected 3 result rows, got %d", len(resp))
+	}
+}
+
+func TestGetProvinceAreaResultHandler_ProvinceMismatchAndAreaNotFound(t *testing.T) {
+	db := setupTestDB(t)
+	r := setupRouter(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/results/provinces/xxxx/areas/99999", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", w.Code)
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp["error"] != "area not found" {
+		t.Fatalf("expected error %q, got %q", "area not found", resp["error"])
+	}
+}
+
+func TestGetProvinceAreaResultHandler_AreaExistsButNoVotes(t *testing.T) {
+	db := setupTestDB(t)
+
+	if err := db.Exec(
+		`INSERT INTO areas (area_id, area_name) VALUES (?, ?)`,
+		2, "กรุงเทพมหานคร เขต 2",
+	).Error; err != nil {
+		t.Fatalf("failed to insert area without votes: %v", err)
+	}
+
+	r := setupRouter(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/results/provinces/bangkok/areas/2", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp) != 0 {
+		t.Fatalf("expected empty result, got %d rows", len(resp))
 	}
 }
