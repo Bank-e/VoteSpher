@@ -1,0 +1,45 @@
+=== RUN   TestHandler_Success
+--- PASS: TestHandler_Success (0.00s)
+=== RUN   TestHandler_InvalidJSON
+--- PASS: TestHandler_InvalidJSON (0.00s)
+=== RUN   TestHandler_MissingStatus_FailsValidation
+--- PASS: TestHandler_MissingStatus_FailsValidation (0.00s)
+=== RUN   TestHandler_MissingVoterID
+--- PASS: TestHandler_MissingVoterID (0.00s)
+=== RUN   TestHandler_VoterIDWrongType
+--- PASS: TestHandler_VoterIDWrongType (0.00s)
+=== RUN   TestHandler_ServiceForbiddenError
+--- PASS: TestHandler_ServiceForbiddenError (0.00s)
+=== RUN   TestHandler_ServiceBadRequestError
+--- PASS: TestHandler_ServiceBadRequestError (0.00s)
+=== RUN   TestHandler_ServiceInternalError
+--- PASS: TestHandler_ServiceInternalError (0.00s)
+=== RUN   TestNormalizeStatus
+--- PASS: TestNormalizeStatus (0.00s)
+=== RUN   TestValidateTimeRange
+--- PASS: TestValidateTimeRange (0.00s)
+=== RUN   TestValidateStatus
+--- PASS: TestValidateStatus (0.00s)
+=== RUN   TestValidateStateTransition
+--- PASS: TestValidateStateTransition (0.00s)
+=== RUN   TestUpdateElectionConfig_Success
+--- PASS: TestUpdateElectionConfig_Success (0.00s)
+=== RUN   TestUpdateElectionConfig_NotAdmin
+--- PASS: TestUpdateElectionConfig_NotAdmin (0.00s)
+=== RUN   TestUpdateElectionConfig_InvalidStatus
+--- PASS: TestUpdateElectionConfig_InvalidStatus (0.00s)
+=== RUN   TestUpdateElectionConfig_InvalidTimeRange
+--- PASS: TestUpdateElectionConfig_InvalidTimeRange (0.00s)
+=== RUN   TestUpdateElectionConfig_NoActiveConfig
+--- PASS: TestUpdateElectionConfig_NoActiveConfig (0.00s)
+=== RUN   TestUpdateElectionConfig_ClosedToOpenForbidden
+--- PASS: TestUpdateElectionConfig_ClosedToOpenForbidden (0.00s)
+=== RUN   TestUpdateElectionConfig_RepositoryFailurePropagatesAppError
+--- PASS: TestUpdateElectionConfig_RepositoryFailurePropagatesAppError (0.00s)
+=== RUN   TestUpdateElectionConfig_RepositoryRawErrorWrapped
+--- PASS: TestUpdateElectionConfig_RepositoryRawErrorWrapped (0.00s)
+=== RUN   TestUpdateElectionConfig_NormalizesLowercaseStatus
+--- PASS: TestUpdateElectionConfig_NormalizesLowercaseStatus (0.00s)
+PASS
+coverage: 77.5% of statements
+ok  	votespher/internal/election	0.086s	coverage: 77.5% of statements
