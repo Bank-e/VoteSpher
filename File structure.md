@@ -79,3 +79,34 @@ VOTESPHER/                           # root ของโปรเจกต์ท
 #
 # ============================================================
 ```
+
+# File structure NEW
+
+---
+
+```structure
+VOTESPHER/
+├── cmd/
+│   └── server/
+│       └── main.go           # Entry point: จุดเริ่มต้นโปรแกรมและการทำ Dependency Injection
+├── config/
+│   └── database.go         # Configuration: จัดการการเชื่อมต่อฐานข้อมูล (PostgreSQL/Redis)
+├── internal/               # Private application and library code
+│   ├── auth/               # Module: ระบบยืนยันตัวตนและการจัดการสิทธิ์
+│   ├── election/           # Module: การจัดการข้อมูลการเลือกตั้ง
+│   ├── info/               # Module: การดึงข้อมูลทั่วไป (Candidates, Parties, Config)
+│   ├── result/             # Module: ระบบคำนวณและประมวลผลคะแนน
+│   ├── voting/             # Module: ระบบลงคะแนน (Voting Logic)
+│   ├── middleware/         # Custom Middleware (e.g., JWT Authentication)
+│   └── models/             # Global Domain Entities (Database Models)
+├── migration/
+│   ├── migrate.go          # Database Migration (Schema definition)
+│   └── seed.go             # Data Seeding (Initial setup data)
+├── pkg/                    # Shared utilities (e.g., JWT helper, Hashing)
+├── .env                    # Environment variables (Sensitive data)
+├── ca.pem                  # SSL/TLS Certificate สำหรับการเชื่อมต่อฐานข้อมูลแบบ Secure (e.g., Cloud DB)
+├── go.mod                  # Go Modules: ระบุชื่อโปรเจกต์และเวอร์ชันของ Library ทั้งหมดที่ใช้
+├── go.sum                  # Checksums: ไฟล์ที่ใช้ยืนยันความถูกต้องและปลอดภัยของ Dependencies
+├── Makefile                # Shortcut commands (make run, make migrate)
+└── README.md
+```
