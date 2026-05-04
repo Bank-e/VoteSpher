@@ -1,11 +1,26 @@
 package info
 
-import "gorm.io/gorm"
-
-func GetCandidatesService(db *gorm.DB, areaID int) ([]Candidate, error) {
-	return GetCandidates(db, areaID)
+// 🔹 Interface
+type InfoService interface {
+	GetCandidates(areaID int) ([]Candidate, error)
+	GetParties() ([]Party, error)
 }
 
-func GetPartiesService(db *gorm.DB) ([]Party, error) {
-	return GetParties(db)
+// 🔹 Struct
+type infoService struct {
+	repo InfoRepository
+}
+
+// 🔹 Constructor
+func NewInfoService(repo InfoRepository) InfoService {
+	return &infoService{repo: repo}
+}
+
+// 🔹 Implementation
+func (s *infoService) GetCandidates(areaID int) ([]Candidate, error) {
+	return s.repo.GetCandidates(areaID)
+}
+
+func (s *infoService) GetParties() ([]Party, error) {
+	return s.repo.GetParties()
 }

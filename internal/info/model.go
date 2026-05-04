@@ -2,7 +2,7 @@ package info
 
 type Candidate struct {
 	CandidateNo int    `gorm:"column:candidate_no"`
-	Name        string `gorm:"column:name"` 
+	Name        string `gorm:"column:name"`
 	PartyID     int    `gorm:"column:party_id"`
 	PartyName   string `gorm:"column:party_name"`
 	LogoURL     string `gorm:"column:logo_url"`

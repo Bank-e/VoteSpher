@@ -6,9 +6,9 @@ import (
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
+	"votespher/internal/info"
 	"votespher/internal/middleware"
 	"votespher/internal/voting"
-	"votespher/internal/info"
 	"votespher/migration"
 
 	"github.com/gin-gonic/gin"
@@ -48,9 +48,13 @@ func main() {
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
-	
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
+	// ================= INFO MODULE =================
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
+
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
@@ -59,7 +63,7 @@ func main() {
 	protected.Use(middleware.RequireAuth())
 	{
 		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
-		
+
 		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db)) // ฟังก์ชันนี้จะรวมสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
 	}
 

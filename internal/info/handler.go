@@ -4,12 +4,20 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-
-	"gorm.io/gorm"
 )
 
-// GET /candidates?area_id=1
-func GetCandidatesHandler(db *gorm.DB) http.HandlerFunc {
+// 🔹 Struct
+type InfoHandler struct {
+	service InfoService
+}
+
+// 🔹 Constructor
+func NewInfoHandler(service InfoService) *InfoHandler {
+	return &InfoHandler{service: service}
+}
+
+// 🔹 GET /candidates
+func (h *InfoHandler) GetCandidatesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -25,7 +33,7 @@ func GetCandidatesHandler(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		result, err := GetCandidatesService(db, areaID)
+		result, err := h.service.GetCandidates(areaID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -35,12 +43,12 @@ func GetCandidatesHandler(db *gorm.DB) http.HandlerFunc {
 	}
 }
 
-// GET /parties
-func GetPartiesHandler(db *gorm.DB) http.HandlerFunc {
+// 🔹 GET /parties
+func (h *InfoHandler) GetPartiesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		result, err := GetPartiesService(db)
+		result, err := h.service.GetParties()
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
