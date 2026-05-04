@@ -38,8 +38,8 @@ func main() {
 
 	// Refactor Layered Architecture
 	voteRepo := voting.NewVotingRepository(db)
-    voteService := voting.NewVotingService(voteRepo)
-    voteHandler := voting.NewVotingHandler(voteService)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
 
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
@@ -69,19 +69,25 @@ func main() {
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
 	// ==========================================
 	protected := r.Group("/")
-    protected.Use(middleware.RequireAuth())
-    {
-        protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
-        protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
-    }
+	protected.Use(middleware.RequireAuth())
+	{
+		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
+	}
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
+
+	// Wire up election dependencies (repo -> service -> handler)
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
+
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
-		admin.PATCH("/election/config", election.UpdateConfigHandler(db)) // ใช้ PATCH หรือ PUT ตามที่คุณออกแบบไว้
+		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
 	// Start Server
