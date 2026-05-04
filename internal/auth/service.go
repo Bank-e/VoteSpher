@@ -45,6 +45,9 @@ func ConfirmOTP(db *gorm.DB, req OTPConfirmRequest) (*OTPConfirmResult, error) {
 
 	// 5. สร้าง JWT Token
 	secretKey := os.Getenv("JWT_SECRET_KEY")
+	if secretKey == "" {
+		return nil, errors.New("ระบบผิดพลาด กรุณาติดต่อผู้ดูแล")
+	}
 	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, "voter", secretKey)
 	if err != nil {
 		return nil, err

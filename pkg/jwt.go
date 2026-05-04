@@ -3,6 +3,8 @@ package pkg
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,8 +19,13 @@ type JWTCustomClaims struct {
 
 // ฟังก์ชันสร้าง Token (ใช้ตอนยืนยัน OTP สำเร็จ)
 func GenerateToken(voterID uint, areaID uint, role string, secretKey string) (string, error) {
-	// กำหนดอายุของ Token (เช่น ให้มีอายุ 2 ชั่วโมง)
-	expirationTime := time.Now().Add(2 * time.Hour)
+	expHours := 2
+	if v := os.Getenv("JWT_EXPIRY_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			expHours = n
+		}
+	}
+	expirationTime := time.Now().Add(time.Duration(expHours) * time.Hour)
 
 	// นำข้อมูลมาใส่ใน Claims
 	claims := &JWTCustomClaims{

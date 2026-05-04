@@ -1,7 +1,7 @@
 package result
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -13,8 +13,6 @@ func GetProvinceAreaResultHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		provinceName := c.Param("provinces_name")
 		areaID := c.Param("area_id")
-
-		fmt.Println(provinceName, areaID)
 
 		_, err := strconv.Atoi(areaID)
 		if err != nil {
@@ -33,8 +31,9 @@ func GetProvinceAreaResultHandler(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 
+			log.Printf("GetProvinceAreaResult error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
+				"error": "เกิดข้อผิดพลาดภายในระบบ",
 			})
 			return
 		}

@@ -40,12 +40,13 @@ func MockTokenHandler() gin.HandlerFunc {
 
 		secretKey := os.Getenv("JWT_SECRET_KEY")
 		if secretKey == "" {
-			secretKey = "dev_secret_key"
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ระบบผิดพลาด กรุณาติดต่อผู้ดูแล"})
+			return
 		}
 
 		token, err := pkg.GenerateToken(req.VoterID, req.AreaID, req.Role, secretKey)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง Token ไม่สำเร็จ: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง Token ไม่สำเร็จ"})
 			return
 		}
 
@@ -136,16 +137,29 @@ func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// ตรวจสอบก่อนว่ามี Voter นี้จริงไหม
-		_, err := FindVoterByID(db, req.VoterID)
+		// ตรวจสอบก่อนว่ามี Voter นี้จริงไหม และดึง email มาใช้ส่ง OTP
+		voter, err := FindVoterByID(db, req.VoterID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบรหัสผู้มีสิทธิ์โหวตนี้"})
 			return
 		}
 
+		if voter.Email == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ผู้มีสิทธิ์โหวตรายนี้ยังไม่มี email ในระบบ"})
+			return
+		}
+
 		// สุ่มรหัสจากฟังก์ชันที่เราเพิ่มไว้ใน service.go
-		otpCode, _ := generateRandomOTP()
-		refCode, _ := generateRefCode()
+		otpCode, err := generateRandomOTP()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
+			return
+		}
+		refCode, err := generateRefCode()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
+			return
+		}
 
 		// บันทึกลงฐานข้อมูล (ตาราง otps)
 		newOTP := models.OTP{
@@ -160,9 +174,14 @@ func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// ส่ง OTP ไปยัง email (ถ้าไม่ได้ตั้ง SMTP จะ skip อัตโนมัติ)
+		if err := pkg.SendOTPEmail(voter.Email, otpCode, refCode); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่"})
+			return
+		}
+
 		c.JSON(http.StatusOK, OTPRequestResponse{
 			RefCode: refCode,
-			OTPCode: otpCode,
 		})
 	}
 }

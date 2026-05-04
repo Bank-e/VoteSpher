@@ -36,6 +36,25 @@ func main() {
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
+	// CORS middleware
+	r.Use(func(c *gin.Context) {
+		allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+		if allowedOrigin == "" {
+			allowedOrigin = "*"
+		}
+		c.Header("Access-Control-Allow-Origin", allowedOrigin)
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
+	// Rate limiting: 60 requests per minute per IP
+	r.Use(middleware.RateLimit())
+
 	// Refactor Layered Architecture
 	voteRepo := voting.NewVotingRepository(db)
 	voteService := voting.NewVotingService(voteRepo)
@@ -45,8 +64,11 @@ func main() {
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
 
-	// แก้เป็น r.POST และเอา gin.WrapH ออก เพราะเป็น Gin Handler แล้ว
-	r.POST("/dev/mock-token", auth.MockTokenHandler())
+	// เปิดใช้งานเฉพาะเมื่อตั้ง ENABLE_DEV_ENDPOINTS=true เท่านั้น
+	if os.Getenv("ENABLE_DEV_ENDPOINTS") == "true" {
+		r.POST("/dev/mock-token", auth.MockTokenHandler())
+		log.Println("⚠️  Dev endpoints enabled — DO NOT use in production")
+	}
 
 	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
 	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
@@ -90,7 +112,11 @@ func main() {
 		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
-	// Start Server
-	log.Println("Server is running on port 8080...")
-	r.Run(":8080")
+	// Start Server — ใช้ PORT จาก env (Railway inject ให้) หรือ default 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Server is running on port %s...", port)
+	r.Run(":" + port)
 }

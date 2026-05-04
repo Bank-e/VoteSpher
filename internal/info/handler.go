@@ -2,6 +2,7 @@ package info
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -27,7 +28,8 @@ func GetCandidatesHandler(db *gorm.DB) http.HandlerFunc {
 
 		result, err := GetCandidatesService(db, areaID)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			log.Printf("GetCandidates error: %v", err)
+			http.Error(w, "เกิดข้อผิดพลาดภายในระบบ", http.StatusInternalServerError)
 			return
 		}
 
@@ -42,7 +44,8 @@ func GetPartiesHandler(db *gorm.DB) http.HandlerFunc {
 
 		result, err := GetPartiesService(db)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			log.Printf("GetParties error: %v", err)
+			http.Error(w, "เกิดข้อผิดพลาดภายในระบบ", http.StatusInternalServerError)
 			return
 		}
 

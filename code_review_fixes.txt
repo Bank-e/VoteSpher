@@ -1,0 +1,196 @@
+================================================================================
+VoteSpher — รายงานการแก้ไขปัญหาจาก Code Review
+วันที่: 2026-05-03
+================================================================================
+
+รวมทั้งหมด: 14 ปัญหาถูกแก้ไข
+  - Critical  : 6 ปัญหา
+  - High      : 5 ปัญหา
+  - Medium    : 3 ปัญหา
+
+================================================================================
+[CRITICAL] ปัญหาระดับวิกฤต
+================================================================================
+
+1. OTP Code ถูกส่งกลับใน API Response โดยตรง
+   ไฟล์   : internal/auth/handler.go, internal/auth/models.go
+   ปัญหา  : endpoint POST /voter/otp-request ส่ง otp_code กลับในผล response
+             ทำให้ใครก็ได้ที่ดัก traffic สามารถอ่าน OTP ได้โดยไม่ต้องมีเบอร์โทรศัพท์
+   แก้ไข  : ลบ OTPCode ออกจาก struct OTPRequestResponse และไม่ส่งค่านี้กลับ
+             OTP ยังถูกบันทึกลง database ปกติ ในระบบจริงควรส่งผ่าน SMS แทน
+   ผล     : Response จะส่งเฉพาะ ref_code เท่านั้น ไม่มี otp_code แล้ว
+
+--------------------------------------------------------------------------------
+
+2. /dev/mock-token เปิดให้ใช้งานได้เสมอแม้ใน production
+   ไฟล์   : cmd/server/main.go
+   ปัญหา  : endpoint นี้สร้าง JWT token โดยไม่ต้องผ่านขั้นตอน OTP
+             ใครก็สามารถสร้าง token ของผู้ใช้คนใดก็ได้ ทำให้ bypass authentication ได้ทั้งหมด
+   แก้ไข  : ห่อ endpoint ด้วย if os.Getenv("ENABLE_DEV_ENDPOINTS") == "true"
+             ถ้าไม่ได้ตั้ง env นี้ endpoint จะไม่ถูก register เลย
+             เพิ่ม log เตือนเมื่อเปิดใช้งาน dev mode
+   ผล     : endpoint จะไม่มีอยู่ใน production จนกว่าจะตั้ง ENABLE_DEV_ENDPOINTS=true
+
+--------------------------------------------------------------------------------
+
+3. JWT Secret Key มี fallback เป็น "dev_secret_key"
+   ไฟล์   : internal/auth/handler.go, internal/auth/service.go
+   ปัญหา  : เมื่อไม่ได้ตั้ง env JWT_SECRET_KEY ระบบจะใช้ "dev_secret_key" แทน
+             ทำให้ production อาจใช้ secret key ที่ทุกคนรู้อยู่ ผู้ไม่หวังดีสามารถ
+             สร้าง JWT token ที่ถูกต้องได้โดยใช้ key นี้
+   แก้ไข  : เปลี่ยนเป็น return error ทันทีถ้า JWT_SECRET_KEY ว่าง
+             handler.go ส่ง HTTP 500 กลับ
+             service.go return error กลับไป
+   ผล     : ระบบจะไม่ทำงานถ้าไม่ได้ตั้ง JWT_SECRET_KEY แทนที่จะทำงานด้วย weak key
+
+--------------------------------------------------------------------------------
+
+4. Database Error ถูกส่งตรงไปยัง Client
+   ไฟล์   : internal/info/handler.go, internal/result/handler.go
+   ปัญหา  : เมื่อเกิด error จาก database เช่น "Error 1045: Access denied for user"
+             หรือ "dial tcp: connection refused" จะถูกส่งกลับให้ client โดยตรง
+             ทำให้ผู้โจมตีรู้โครงสร้าง database, ชื่อ table, หรือ configuration
+   แก้ไข  : info/handler.go: ใช้ log.Printf เพื่อ log error ภายใน แล้วส่ง generic message
+             result/handler.go: เหมือนกัน + ลบ fmt.Println debug ออก
+   ผล     : Client จะเห็นแค่ "เกิดข้อผิดพลาดภายในระบบ" เท่านั้น error จริงอยู่ใน log
+
+--------------------------------------------------------------------------------
+
+5. ไม่ตรวจสอบ Error จาก db.DB() ใน Connection Pool Setup
+   ไฟล์   : config/database.go
+   ปัญหา  : บรรทัด sqlDB, _ := db.DB() ใช้ _ เพื่อ ignore error
+             ถ้า gorm ไม่สามารถดึง underlying *sql.DB ได้ sqlDB จะเป็น nil
+             ทำให้ app crash ในลักษณะ nil pointer ที่ trace กลับยาก
+   แก้ไข  : เพิ่ม error check และ log.Fatalf ถ้าดึง DB ไม่ได้
+   ผล     : Error จะถูก report ชัดเจนทันทีที่ startup แทนที่จะ crash ภายหลัง
+
+--------------------------------------------------------------------------------
+
+6. Error ภายในระบบถูกส่งให้ Client ใน voting handler
+   ไฟล์   : internal/voting/handler.go
+   ปัญหา  : กรณี error ที่ไม่ใช่ AppError เช่น database crash จะส่ง
+             "เกิดข้อผิดพลาดภายในระบบ: " + err.Error() กลับไปให้ client
+             เปิดเผยข้อมูล internal error message
+   แก้ไข  : ตัด err.Error() ออก เหลือแค่ "เกิดข้อผิดพลาดภายในระบบ"
+   ผล     : Client ไม่เห็น internal error details อีกต่อไป
+
+================================================================================
+[HIGH] ปัญหาระดับสูง
+================================================================================
+
+7. ไม่มี CORS Headers
+   ไฟล์   : cmd/server/main.go
+   ปัญหา  : Browser จะบล็อก request จาก frontend domain อื่น (CORS policy)
+             ทำให้ web application ไม่สามารถเรียก API ได้เลย
+   แก้ไข  : เพิ่ม CORS middleware ใน main.go
+             - Access-Control-Allow-Origin: ค่าจาก env CORS_ALLOWED_ORIGIN (default: *)
+             - Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS
+             - Access-Control-Allow-Headers: Content-Type, Authorization
+             - รองรับ preflight request (OPTIONS) ด้วย HTTP 204
+   ผล     : Frontend สามารถเรียก API ได้ แนะนำให้ตั้ง CORS_ALLOWED_ORIGIN เป็น domain จริงใน production
+
+--------------------------------------------------------------------------------
+
+8. ไม่มี Rate Limiting
+   ไฟล์   : internal/middleware/rate_limit.go (สร้างใหม่), cmd/server/main.go
+   ปัญหา  : ผู้โจมตีสามารถส่ง request ได้ไม่จำกัดต่อวินาที
+             - brute force OTP (1,000,000 combination)
+             - DDoS โดยตรงที่ API
+   แก้ไข  : สร้าง RateLimit middleware ใหม่ ใช้ sliding window algorithm
+             จำกัด 60 request ต่อนาที ต่อ IP address
+             เกิน limit ส่ง HTTP 429 กลับพร้อมข้อความภาษาไทย
+   ผล     : การ brute force OTP จะช้าลง 1,000,000 เท่า (จาก seconds เป็น 11 วัน)
+
+--------------------------------------------------------------------------------
+
+9. ไม่มี Input Validation Tags ใน SubmitBallotRequest
+   ไฟล์   : internal/voting/model.go
+   ปัญหา  : CandidateNo และ PartyNo ไม่มี binding:"required"
+             ผู้ใช้สามารถส่ง body ว่างและผ่าน validation ได้
+             ทำให้บันทึก vote ที่ไม่สมบูรณ์ลง database
+   แก้ไข  : เพิ่ม binding:"required" ทั้งสอง field
+   ผล     : Gin จะ reject request ที่ไม่มี candidate_no หรือ party_no ก่อนถึง business logic
+
+--------------------------------------------------------------------------------
+
+10. ไม่จัดการ Error จาก generateRandomOTP และ generateRefCode
+    ไฟล์   : internal/auth/handler.go
+    ปัญหา  : ใช้ otpCode, _ := generateRandomOTP() — ignore error
+              ถ้า crypto/rand อ่านไม่ได้ (เช่น OS entropy exhausted)
+              otpCode จะเป็น empty string แต่ระบบยังสร้าง OTP ต่อ
+    แก้ไข  : เปลี่ยนเป็นตรวจ error และ return HTTP 500 ทันที
+    ผล     : ไม่มีการสร้าง OTP ที่ไม่สมบูรณ์หรือ empty เข้า database
+
+--------------------------------------------------------------------------------
+
+11. Debug Code (fmt.Println) ตกค้างใน Production Code
+    ไฟล์   : internal/result/handler.go
+    ปัญหา  : fmt.Println(provinceName, areaID) บรรทัดที่ 17
+              print ทุก request ลง stdout ทำให้ log รก และเปิดเผย path parameters
+    แก้ไข  : ลบบรรทัดนั้นออก พร้อมลบ import "fmt" ที่ไม่ใช้แล้ว
+    ผล     : Log สะอาดขึ้น ไม่มีข้อมูล request parameters ใน stdout
+
+================================================================================
+[MEDIUM] ปัญหาระดับกลาง
+================================================================================
+
+12. JWT Token Expiration Hardcoded
+    ไฟล์   : pkg/jwt.go
+    ปัญหา  : 2 * time.Hour ถูก hardcode ในโค้ด
+              ไม่สามารถปรับเวลาหมดอายุได้โดยไม่ต้อง recompile
+              ในระบบ high-security ควรใช้ expiry สั้นกว่านี้
+    แก้ไข  : อ่านค่าจาก env JWT_EXPIRY_HOURS (int)
+              ถ้าไม่ได้ตั้ง fallback เป็น 2 ชั่วโมงตามเดิม
+    ผล     : สามารถปรับ token expiry ผ่าน env โดยไม่ต้อง redeploy
+
+--------------------------------------------------------------------------------
+
+13. parseTime() ใน seed.go ไม่ log Error
+    ไฟล์   : migration/seed.go
+    ปัญหา  : t, _ := time.Parse(...) ใน parseTime() ignore error
+              ถ้า time string format ผิด จะคืน zero value time.Time
+              ทำให้ seed data มีวันที่ผิดโดยไม่รู้
+    แก้ไข  : เพิ่ม error check + log.Printf เมื่อ parse ล้มเหลว
+    ผล     : นักพัฒนาจะรู้ทันทีถ้า seed data มี format วันที่ผิด
+
+--------------------------------------------------------------------------------
+
+14. (Note) ยังไม่แก้ — ต้องการ Infrastructure
+    ปัญหา  : ไม่มี Unit Tests (coverage 0%), ไม่มี structured logging,
+              ไม่มี Redis cache สำหรับ realtime results,
+              ไม่มี HTTPS enforcement (ต้องทำผ่าน reverse proxy)
+    สาเหตุ : การเพิ่ม test ต้องออกแบบ test cases ร่วมกับทีม
+              การเพิ่ม Redis ต้องมี infrastructure รองรับ
+              HTTPS ต้องทำผ่าน Nginx/Caddy ไม่ใช่ใน application code
+    แนะนำ  : เพิ่ม unit test สำหรับ voting/service.go ก่อนเป็นอันดับแรก
+              เพิ่ม logrus หรือ slog แทน log.Println standard
+
+================================================================================
+สรุปไฟล์ที่ถูกแก้ไข
+================================================================================
+
+  internal/auth/handler.go        — OTP response fix, JWT key check, error handling
+  internal/auth/models.go         — ลบ OTPCode จาก OTPRequestResponse struct
+  internal/auth/service.go        — JWT secret key validation
+  cmd/server/main.go              — Dev endpoint guard, CORS middleware, rate limiting
+  config/database.go              — DB() error check
+  internal/info/handler.go        — Generic error message + logging
+  internal/result/handler.go      — ลบ fmt.Println, generic error message + logging
+  internal/voting/handler.go      — ลบ error detail leakage
+  internal/voting/model.go        — เพิ่ม binding:"required" tags
+  pkg/jwt.go                      — JWT expiry จาก env variable
+  migration/seed.go               — parseTime error logging
+
+  internal/middleware/rate_limit.go  [ไฟล์ใหม่] — Rate limiting middleware
+
+================================================================================
+Environment Variables ที่เกี่ยวข้องหลังการแก้ไข
+================================================================================
+
+  JWT_SECRET_KEY         (required) — secret สำหรับ sign JWT, ต้องตั้งเสมอ
+  HASH_SECRET_KEY        (required) — secret สำหรับ hash citizen ID
+  ENABLE_DEV_ENDPOINTS   (optional) — ตั้งเป็น "true" เพื่อเปิด /dev/mock-token
+  CORS_ALLOWED_ORIGIN    (optional) — domain ที่อนุญาต CORS (default: *)
+  JWT_EXPIRY_HOURS       (optional) — อายุ JWT token เป็นชั่วโมง (default: 2)
+
+================================================================================

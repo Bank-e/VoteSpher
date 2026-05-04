@@ -1,2 +1,11 @@
 .env
 ca.pem
+DB test/
+.claude/
+temp_clone/
+coverage.html
+coverage.out
+test_result.json
+test_result.txt
+frontend/node_modules/
+frontend/dist/

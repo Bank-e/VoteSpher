@@ -26,15 +26,21 @@ func ConnectDB() *gorm.DB {
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 	dbname := os.Getenv("DB_NAME")
-	caCert := os.Getenv("DB_CA_CERT")
 
-	// โหลด CA Certificate
-	rootCertPool := x509.NewCertPool()
-	pem, err := os.ReadFile(caCert)
-	if err != nil {
-		log.Fatalf("Failed to read CA cert: %v", err)
+	// รองรับทั้ง path ไฟล์ (local) และ content ตรงๆ (cloud/Railway)
+	var pemBytes []byte
+	if content := os.Getenv("DB_CA_CERT_CONTENT"); content != "" {
+		pemBytes = []byte(content)
+	} else {
+		var err error
+		pemBytes, err = os.ReadFile(os.Getenv("DB_CA_CERT"))
+		if err != nil {
+			log.Fatalf("Failed to read CA cert: %v", err)
+		}
 	}
-	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+
+	rootCertPool := x509.NewCertPool()
+	if ok := rootCertPool.AppendCertsFromPEM(pemBytes); !ok {
 		log.Fatal("Failed to append CA cert")
 	}
 
@@ -55,7 +61,10 @@ func ConnectDB() *gorm.DB {
 	}
 
 	// Connection Pool
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying DB: %v", err)
+	}
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(5)
 
