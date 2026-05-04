@@ -55,10 +55,14 @@ func main() {
 	// Rate limiting: 60 requests per minute per IP
 	r.Use(middleware.RateLimit())
 
-	// Refactor Layered Architecture
+	// Dependency Injection
 	voteRepo := voting.NewVotingRepository(db)
 	voteService := voting.NewVotingService(voteRepo)
 	voteHandler := voting.NewVotingHandler(voteService)
+
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
 
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
@@ -77,9 +81,19 @@ func main() {
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
+	// ยืนยัน OTP แล้วรับ JWT token
+	r.POST("/voter/otp-confirm", auth.OTPConfirmHandler(db))
 
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
+	// Info module — Layered Architecture (feat/info)
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
+
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
+
+	// ดูสถานะการเลือกตั้งปัจจุบัน (public)
+	r.GET("/election/config", electionHandler.GetConfig)
 
 	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
 	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
@@ -93,6 +107,7 @@ func main() {
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
+		protected.GET("/voter/me", auth.VoterMeHandler(db))
 		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
 		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
@@ -100,12 +115,6 @@ func main() {
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
-
-	// Wire up election dependencies (repo -> service -> handler)
-	electionRepo := election.NewRepository(db)
-	electionSvc := election.NewService(electionRepo)
-	electionHandler := election.NewHandler(electionSvc)
-
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
