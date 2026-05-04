@@ -6,15 +6,27 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetVoteResultByArea(db *gorm.DB, areaID uint) (AreaResultResponse, error) {
+type ResultRepository interface {
+	GetVoteResultByArea(areaID uint) (AreaResultResponse, error)
+}
+
+type resultRepository struct {
+	db *gorm.DB
+}
+
+func NewResultRepository(db *gorm.DB) ResultRepository {
+	return &resultRepository{db: db}
+}
+
+func (r *resultRepository) GetVoteResultByArea(areaID uint) (AreaResultResponse, error) {
 	var area models.Area
 
-	if err := db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
+	if err := r.db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
 		return AreaResultResponse{}, err
 	}
 
 	var candidateResults []CandidateResult
-	if err := db.
+	if err := r.db.
 		Table("votes").
 		Select("candidates.candidate_no, candidates.full_name AS name, COUNT(votes.vote_id) AS votes").
 		Joins("JOIN candidates ON votes.candidate_id = candidates.candidate_id").
@@ -26,7 +38,7 @@ func GetVoteResultByArea(db *gorm.DB, areaID uint) (AreaResultResponse, error) {
 	}
 
 	var partyResults []PartyResult
-	if err := db.
+	if err := r.db.
 		Table("votes").
 		Select("parties.party_no, parties.party_name, COUNT(votes.vote_id) AS votes").
 		Joins("JOIN parties ON votes.party_id = parties.party_id").
@@ -38,7 +50,7 @@ func GetVoteResultByArea(db *gorm.DB, areaID uint) (AreaResultResponse, error) {
 	}
 
 	var lastUpdated string
-	_ = db.
+	_ = r.db.
 		Table("votes").
 		Select("MAX(created_at)").
 		Where("area_id = ?", areaID).

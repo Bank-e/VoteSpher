@@ -8,33 +8,39 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetAreaResultHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		areaIDParam := c.Param("id")
+type ResultHandler struct {
+	service ResultService
+}
 
-		areaID, err := strconv.Atoi(areaIDParam)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid id: must be a number",
-			})
-			return
-		}
+func NewResultHandler(service ResultService) *ResultHandler {
+	return &ResultHandler{service: service}
+}
 
-		result, err := GetAreaResultService(db, uint(areaID))
-		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error": "area not found",
-				})
-				return
-			}
+func (h *ResultHandler) GetAreaResult(c *gin.Context) {
+	areaIDParam := c.Param("id")
 
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, result)
+	areaID, err := strconv.Atoi(areaIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid id: must be a number",
+		})
+		return
 	}
+
+	result, err := h.service.GetAreaResult(uint(areaID))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "area not found",
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }

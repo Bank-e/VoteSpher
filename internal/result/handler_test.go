@@ -100,8 +100,13 @@ func seedTestData(t *testing.T, db *gorm.DB) {
 func setupRouter(db *gorm.DB) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
+	resultRepo := NewResultRepository(db)
+	resultService := NewResultService(resultRepo)
+	resultHandler := NewResultHandler(resultService)
+
 	r := gin.Default()
-	r.GET("/results/area/:id", GetAreaResultHandler(db))
+	r.GET("/results/area/:id", resultHandler.GetAreaResult)
+
 	return r
 }
 
