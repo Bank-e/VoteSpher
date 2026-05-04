@@ -2,29 +2,59 @@ package voting
 
 import (
 	"errors"
-	"time"
 	"strings"
+	"time"
 	"votespher/internal/models"
 
 	"gorm.io/gorm"
 )
 
-// SubmitVoteService จัดการขั้นตอนและกฎเกณฑ์ก่อนการลงคะแนน
-// (สมมติว่า SubmitBallotRequest ยังอยู่ใน package voting ถ้าย้ายไป models แล้วก็ต้องเติม models. ด้วยครับ)
-func SubmitVoteService(db *gorm.DB, voterID uint, areaID uint, req SubmitBallotRequest) error {
-	
+// ==========================================
+// 1. Interface
+// ==========================================
+
+// VotingService กำหนดสัญญา (Contract) ว่า Service นี้ทำอะไรได้บ้าง
+type VotingService interface {
+	SubmitVote(voterID uint, areaID uint, req SubmitBallotRequest) error
+	GetBallotStatus(voterID uint) (*BallotStatusResponse, error)
+}
+
+// ==========================================
+// 2. Struct & Constructor
+// ==========================================
+
+// votingService เป็น Implementation ของ VotingService Interface
+type votingService struct {
+	repo VotingRepository // เรียกใช้งาน Repository ผ่าน Interface
+}
+
+// NewVotingService สร้าง Instance ของ Service โดยรับ Repository เข้ามา (Dependency Injection)
+func NewVotingService(repo VotingRepository) VotingService {
+	return &votingService{
+		repo: repo,
+	}
+}
+
+// ==========================================
+// 3. Methods (Business Logic)
+// ==========================================
+
+// SubmitVote จัดการขั้นตอนและกฎเกณฑ์ก่อนการลงคะแนน
+func (s *votingService) SubmitVote(voterID uint, areaID uint, req SubmitBallotRequest) error {
+
 	// 1. ดึงการตั้งค่าระบบจาก Repository
-	config, err := GetActiveConfig(db)
+	config, err := s.repo.GetActiveConfig()
 	if err != nil {
-		return err
+		// กรณีไม่พบการตั้งค่า ส่ง 500 กลับไป
+		return NewAppError(500, "ไม่พบการตั้งค่าระบบเลือกตั้งที่ใช้งานอยู่")
 	}
 
-	// 2. ด่านตรวจสอบสถานะระบบ
+	// 2. ด่านตรวจสอบสถานะระบบและเวลาการลงคะแนน
 	now := time.Now()
 	statusLower := strings.ToLower(config.Status) // แปลงเป็นตัวพิมพ์เล็กป้องกันปัญหา OPEN vs open
-	
+
 	if statusLower != "open" || now.Before(config.StartTime) || now.After(config.EndTime) {
-		return errors.New("403: อยู่นอกเวลาการลงคะแนน หรือระบบปิดรับคะแนนแล้ว")
+		return NewAppError(403, "อยู่นอกเวลาการลงคะแนน หรือระบบปิดรับคะแนนแล้ว")
 	}
 
 	// 3. เตรียมข้อมูลผลโหวต (ประกอบร่าง Data)
@@ -43,36 +73,38 @@ func SubmitVoteService(db *gorm.DB, voterID uint, areaID uint, req SubmitBallotR
 	// สร้าง struct models.Vote รอไว้ โดยไม่ใส่ VoterID เพื่อรักษา Secret Ballot
 	voteRecord := models.Vote{
 		AreaID:      areaID,
-		CandidateID: candidateID, 
-		PartyID:     partyID,     
+		CandidateID: candidateID,
+		PartyID:     partyID,
 		CreatedAt:   time.Now(),
 	}
 
 	// 4. สั่งให้ Repository ทำการบันทึกข้อมูลแบบ Transaction
-	return ExecuteVoteTransaction(db, voterID, voteRecord)
+	// Repository มีการจัดการส่ง AppError มาให้แล้วหากเกิดข้อผิดพลาด
+	return s.repo.ExecuteVoteTransaction(voterID, voteRecord)
 }
 
-// GetBallotStatusService รวบรวมข้อมูลสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
-func GetBallotStatusService(db *gorm.DB, voterID uint) (*BallotStatusResponse, error) {
-	
+// GetBallotStatus รวบรวมข้อมูลสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
+func (s *votingService) GetBallotStatus(voterID uint) (*BallotStatusResponse, error) {
+
 	// 1. ตรวจสอบสถานะว่าโหวตหรือยัง
-	isVoted, err := CheckUserHasVoted(db, voterID)
+	isVoted, err := s.repo.CheckUserHasVoted(voterID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("404: ไม่พบข้อมูลผู้ใช้งานในระบบ")
+			return nil, NewAppError(404, "ไม่พบข้อมูลผู้ใช้งานในระบบ")
 		}
-		return nil, errors.New("500: ไม่สามารถตรวจสอบประวัติการลงคะแนนของผู้ใช้ได้")
+		return nil, NewAppError(500, "ไม่สามารถตรวจสอบประวัติการลงคะแนนของผู้ใช้ได้")
 	}
 
 	// 2. ตรวจสอบการตั้งค่าระบบเลือกตั้ง
-	config, err := GetActiveElectionConfig(db)
+	// หมายเหตุ: ยุบรวมไปเรียกใช้ GetActiveConfig ตัวเดียวกับตอน Submit เพื่อลดโค้ดซ้ำซ้อน
+	config, err := s.repo.GetActiveConfig()
 	if err != nil {
 		// กรณีที่ฐานข้อมูลเพิ่งสร้างใหม่ ยังไม่มีแอดมินมาตั้งค่าใดๆ เลย
 		// ให้ถือว่าระบบอยู่ในสถานะ "เตรียมการ (PREPARE)"
 		return &BallotStatusResponse{
 			ElectionStatus: "PREPARE",
 			ServerTime:     time.Now(),
-			IsVoted:       isVoted,
+			IsVoted:        isVoted,
 		}, nil
 	}
 

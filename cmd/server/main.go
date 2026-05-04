@@ -8,6 +8,8 @@ import (
 	"votespher/internal/election"
 	"votespher/internal/info"
 	"votespher/internal/middleware"
+	"votespher/internal/realtime"
+	"votespher/internal/result"
 	"votespher/internal/voting"
 	"votespher/migration"
 
@@ -34,6 +36,11 @@ func main() {
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
+	// Refactor Layered Architecture
+	voteRepo := voting.NewVotingRepository(db)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
+
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
@@ -56,24 +63,35 @@ func main() {
 	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
+	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
+	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
+	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
+	//เพิ่ทม API สำหรับผลโหวตแบบเรียลไทม์แยกตามเขต
+	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
+
 	// ==========================================
 	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
 	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
-		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
-
-		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db)) // ฟังก์ชันนี้จะรวมสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
+		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
+
+	// Wire up election dependencies (repo -> service -> handler)
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
+
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
-		admin.PATCH("/election/config", election.UpdateConfigHandler(db)) // ใช้ PATCH หรือ PUT ตามที่คุณออกแบบไว้
+		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
 	// Start Server
