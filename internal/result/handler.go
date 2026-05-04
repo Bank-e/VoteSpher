@@ -1,7 +1,6 @@
 package result
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -9,22 +8,19 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetProvinceAreaResultHandler(db *gorm.DB) gin.HandlerFunc {
+func GetAreaResultHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		provinceName := c.Param("provinces_name")
-		areaID := c.Param("area_id")
+		areaIDParam := c.Param("id")
 
-		fmt.Println(provinceName, areaID)
-
-		_, err := strconv.Atoi(areaID)
+		areaID, err := strconv.Atoi(areaIDParam)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid area_id: must be a number",
+				"error": "invalid id: must be a number",
 			})
 			return
 		}
 
-		result, err := GetProvinceAreaResultService(db, provinceName, areaID)
+		result, err := GetAreaResultService(db, uint(areaID))
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(http.StatusNotFound, gin.H{

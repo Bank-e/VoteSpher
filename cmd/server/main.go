@@ -54,7 +54,7 @@ func main() {
 
 	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
 
-	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
+	r.GET("/results/area/:id", result.GetAreaResultHandler(db))
 	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
 	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
 	//เพิ่ทม API สำหรับผลโหวตแบบเรียลไทม์แยกตามเขต

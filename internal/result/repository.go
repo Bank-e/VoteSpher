@@ -6,36 +6,49 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetProvinceAreaResultRepository(db *gorm.DB, provinceName string, areaID string) (AreaResultResponse, error) {
+func GetVoteResultByArea(db *gorm.DB, areaID uint) (AreaResultResponse, error) {
 	var area models.Area
 
-	err := db.Where("area_id = ?", areaID).First(&area).Error
-	if err != nil {
+	if err := db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
 		return AreaResultResponse{}, err
 	}
 
-	return AreaResultResponse{
-		ProvinceName: provinceName, // ยัง mock ไว้ก่อน
-		AreaID:       areaID,
-		Message:      area.AreaName, // ใช้ของจริงจาก DB
-	}, nil
-}
-
-func GetVoteResultByArea(db *gorm.DB, areaID string) ([]map[string]interface{}, error) {
-	var area models.Area
-	if err := db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
-		return nil, err
+	var candidateResults []CandidateResult
+	if err := db.
+		Table("votes").
+		Select("candidates.candidate_no, candidates.full_name AS name, COUNT(votes.vote_id) AS votes").
+		Joins("JOIN candidates ON votes.candidate_id = candidates.candidate_id").
+		Where("votes.area_id = ?", areaID).
+		Group("candidates.candidate_no, candidates.full_name").
+		Order("votes DESC").
+		Scan(&candidateResults).Error; err != nil {
+		return AreaResultResponse{}, err
 	}
 
-	var results []map[string]interface{}
-
-	err := db.
+	var partyResults []PartyResult
+	if err := db.
 		Table("votes").
-		Select("parties.party_name, COUNT(*) as total").
+		Select("parties.party_no, parties.party_name, COUNT(votes.vote_id) AS votes").
 		Joins("JOIN parties ON votes.party_id = parties.party_id").
 		Where("votes.area_id = ?", areaID).
-		Group("parties.party_name").
-		Find(&results).Error
+		Group("parties.party_no, parties.party_name").
+		Order("votes DESC").
+		Scan(&partyResults).Error; err != nil {
+		return AreaResultResponse{}, err
+	}
 
-	return results, err
+	var lastUpdated string
+	_ = db.
+		Table("votes").
+		Select("MAX(created_at)").
+		Where("area_id = ?", areaID).
+		Scan(&lastUpdated).Error
+
+	return AreaResultResponse{
+		AreaID:           areaID,
+		AreaName:         area.AreaName,
+		LastUpdated:      lastUpdated,
+		CandidateResults: candidateResults,
+		PartyListResults: partyResults,
+	}, nil
 }
