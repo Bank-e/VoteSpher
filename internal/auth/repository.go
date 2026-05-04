@@ -36,11 +36,14 @@ func FindVoterByID(db *gorm.DB, voterID uint) (*models.Voter, error) {
 	return &voter, nil
 }
 
-// ค้นหา Voter พร้อมดึงข้อมูล Area (เขต/จังหวัด) มาด้วย
+// ค้นหา Voter พร้อมดึงข้อมูล Area และ Province ที่แยกตารางกันมาด้วย
 func FindVoterByCitizenIDHash(db *gorm.DB, citizenIDHash string) (*models.Voter, error) {
 	var voter models.Voter
-	// Preload("Area") จะทำให้ GORM ไปดึงชื่อเขตและจังหวัดมาจากตาราง areas ให้เราอัตโนมัติ
-	err := db.Preload("Area").Where("citizen_id_hash = ?", citizenIDHash).First(&voter).Error
+
+	// เปลี่ยนจาก db.Preload("Area") เป็น db.Preload("Area.Province")
+	// เพื่อให้ GORM ดึงข้อมูล Area และทะลุไปดึง Province มาให้ครบ
+	err := db.Preload("Area.Province").Where("citizen_id_hash = ?", citizenIDHash).First(&voter).Error
+
 	if err != nil {
 		return nil, err
 	}
