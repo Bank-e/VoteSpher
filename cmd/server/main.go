@@ -55,9 +55,13 @@ func main() {
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
+	// ================= INFO MODULE =================
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
 
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
 	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
 	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์

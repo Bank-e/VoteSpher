@@ -1,11 +1,33 @@
 package info
 
-import "gorm.io/gorm"
+import (
+	"context"
 
-func GetCandidates(db *gorm.DB, areaID string) ([]Candidate, error) {
+	"gorm.io/gorm"
+)
+
+// 🔹 Interface
+type InfoRepository interface {
+	GetCandidates(areaID int) ([]Candidate, error)
+	GetParties() ([]Party, error)
+}
+
+// 🔹 Struct
+type infoRepository struct {
+	db *gorm.DB
+}
+
+// 🔹 Constructor
+func NewInfoRepository(db *gorm.DB) InfoRepository {
+	return &infoRepository{db: db}
+}
+
+// 🔹 Implementation
+func (r *infoRepository) GetCandidates(areaID int) ([]Candidate, error) {
 	var result []Candidate
 
-	err := db.Table("candidates").
+	err := r.db.WithContext(context.Background()).
+		Table("candidates").
 		Select(`
 			candidates.candidate_no,
 			candidates.full_name as name,
@@ -21,10 +43,10 @@ func GetCandidates(db *gorm.DB, areaID string) ([]Candidate, error) {
 	return result, err
 }
 
-func GetParties(db *gorm.DB) ([]Party, error) {
+func (r *infoRepository) GetParties() ([]Party, error) {
 	var result []Party
 
-	err := db.Table("parties").
+	err := r.db.Table("parties").
 		Select(`
 			party_id,
 			party_no,
