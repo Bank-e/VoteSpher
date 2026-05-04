@@ -91,7 +91,7 @@ func OTPConfirmHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// POST /voter/verify
+// / POST /voter/verify
 // ฟังก์ชันสำหรับตรวจสอบสิทธิ์ผู้เลือกตั้ง
 func VerifyVoterHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -118,7 +118,7 @@ func VerifyVoterHandler(db *gorm.DB) gin.HandlerFunc {
 				Name:     "ข้อมูลปกปิด",
 				AreaID:   voter.AreaID,
 				AreaName: voter.Area.AreaName,
-				Province: "ไม่ระบุจังหวัด",
+				Province: voter.Area.Province.ProvinceName, // 👈 แก้ตรงนี้: ดึงชื่อจังหวัดมาโชว์ของจริงแล้ว!
 				IsVoted:  voter.IsVoted,
 			},
 		}
