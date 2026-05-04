@@ -36,6 +36,11 @@ func main() {
 	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
+	// Refactor Layered Architecture
+	voteRepo := voting.NewVotingRepository(db)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
+
 	// ==========================================
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
@@ -50,9 +55,13 @@ func main() {
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
 
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
+	// ================= INFO MODULE =================
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
 
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
 	r.GET("/results/area/:id", result.GetAreaResultHandler(db))
 	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
@@ -66,18 +75,23 @@ func main() {
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
-		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
-
-		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db)) // ฟังก์ชันนี้จะรวมสถานะระบบและสถานะผู้ใช้เข้าด้วยกัน
+		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
 
 	// ==========================================
 	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
 	// ==========================================
+
+	// Wire up election dependencies (repo -> service -> handler)
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
+
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
-		admin.PATCH("/election/config", election.UpdateConfigHandler(db)) // ใช้ PATCH หรือ PUT ตามที่คุณออกแบบไว้
+		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
 	// Start Server

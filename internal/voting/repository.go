@@ -1,7 +1,6 @@
 package voting
 
 import (
-	"errors"
 	"time"
 	"votespher/internal/models"
 
@@ -9,33 +8,65 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// GetActiveConfig ดึงการตั้งค่าระบบที่กำลังเปิดใช้งานอยู่
-func GetActiveConfig(db *gorm.DB) (*models.SystemConfig, error) {
-	var config models.SystemConfig // ใส่ models.
-	if err := db.Where("is_active = ?", true).First(&config).Error; err != nil {
-		return nil, errors.New("ไม่พบการตั้งค่าระบบเลือกตั้งที่ใช้งานอยู่")
+// ==========================================
+// ************** Interface **************
+// ==========================================
+
+// VotingRepository กำหนดสัญญา (Contract) ว่า Repository นี้ทำอะไรได้บ้าง
+type VotingRepository interface {
+	GetActiveConfig() (*models.SystemConfig, error)
+	ExecuteVoteTransaction(voterID uint, voteRecord models.Vote) error
+	CheckUserHasVoted(voterID uint) (bool, error)
+}
+
+// ==========================================
+// ********* Struct & Constructor *********
+// ==========================================
+
+// votingRepository เป็น Implementation ของ VotingRepository Interface
+type votingRepository struct {
+	db *gorm.DB
+}
+
+// NewVotingRepository สร้าง Instance ของ Repository โดยรับ Database Connection เข้ามา
+func NewVotingRepository(db *gorm.DB) VotingRepository {
+	return &votingRepository{
+		db: db,
+	}
+}
+
+// ==========================================
+// **************** Methods ****************
+// ==========================================
+
+// GetActiveConfig ดึงการตั้งค่าระบบที่กำลังเปิดใช้งานอยู่ (ใช้แทนทั้ง GetActiveConfig และ GetActiveElectionConfig เดิม)
+func (r *votingRepository) GetActiveConfig() (*models.SystemConfig, error) {
+	var config models.SystemConfig
+	if err := r.db.Where("is_active = ?", true).First(&config).Error; err != nil {
+		return nil, err // ส่ง Error ดิบกลับไปให้ Service ตัดสินใจจัดการต่อ
 	}
 	return &config, nil
 }
 
 // ExecuteVoteTransaction จัดการบันทึกคะแนนโหวตในรูปแบบ Transaction
-func ExecuteVoteTransaction(db *gorm.DB, voterID uint, voteRecord models.Vote) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		var voter models.Voter // ใส่ models.
-		
+func (r *votingRepository) ExecuteVoteTransaction(voterID uint, voteRecord models.Vote) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var voter models.Voter
+
 		// ล็อก Row ข้อมูลผู้โหวตคนนี้ (ป้องกัน Race condition หรือการยิง Request ซ้ำๆ เข้ามาพร้อมกัน)
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&voter, voterID).Error; err != nil {
-			return errors.New("404: ไม่พบข้อมูลผู้มีสิทธิเลือกตั้ง")
+			// ใช้ Custom Error ที่เราสร้างไว้ใน model.go
+			return NewAppError(404, "ไม่พบข้อมูลผู้มีสิทธิเลือกตั้ง")
 		}
 
 		// เช็คสถานะการโหวต *ต้องทำใน Transaction ที่ถูกล็อกแล้วเท่านั้น*
 		if voter.IsVoted {
-			return errors.New("403: คุณได้ลงคะแนนไปแล้ว ไม่สามารถลงคะแนนซ้ำได้")
+			return NewAppError(403, "คุณได้ลงคะแนนไปแล้ว ไม่สามารถลงคะแนนซ้ำได้")
 		}
 
 		// บันทึกคะแนน (Secret Ballot - ในตัวแปร voteRecord จะไม่มี voterID)
 		if err := tx.Create(&voteRecord).Error; err != nil {
-			return errors.New("500: ไม่สามารถบันทึกคะแนนได้")
+			return NewAppError(500, "ไม่สามารถบันทึกคะแนนได้")
 		}
 
 		// อัปเดตสถานะผู้โหวตว่า "โหวตแล้ว"
@@ -43,29 +74,19 @@ func ExecuteVoteTransaction(db *gorm.DB, voterID uint, voteRecord models.Vote) e
 			"is_voted": true,
 			"voted_at": time.Now(),
 		}).Error; err != nil {
-			return errors.New("500: ไม่สามารถอัปเดตสถานะผู้โหวตได้")
+			return NewAppError(500, "ไม่สามารถอัปเดตสถานะผู้โหวตได้")
 		}
 
 		return nil
 	})
 }
 
-// GetActiveElectionConfig ค้นหาการตั้งค่าระบบที่กำลังใช้งานอยู่
-func GetActiveElectionConfig(db *gorm.DB) (*models.SystemConfig, error) {
-	var config models.SystemConfig
-	// หาแถวที่ is_active เป็น true (หรือ 1)
-	if err := db.Where("is_active = ?", true).First(&config).Error; err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
 // CheckUserHasVoted ตรวจสอบว่าผู้ใช้งานคนนี้เคยลงคะแนนไปแล้วหรือยัง
-func CheckUserHasVoted(db *gorm.DB, voterID uint) (bool, error) {
+func (r *votingRepository) CheckUserHasVoted(voterID uint) (bool, error) {
 	var voter models.Voter
 
 	// ส่ง ID เข้าไปใน First โดยตรง GORM จะใช้ Primary Key ให้เอง
-	if err := db.Select("is_voted").First(&voter, voterID).Error; err != nil {
+	if err := r.db.Select("is_voted").First(&voter, voterID).Error; err != nil {
 		return false, err
 	}
 	return voter.IsVoted, nil
