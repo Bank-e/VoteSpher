@@ -62,6 +62,37 @@ func MockTokenHandler() gin.HandlerFunc {
 	}
 }
 
+// GET /voter/me — ดูข้อมูลตัวเองหลัง login (ต้องมี JWT)
+func VoterMeHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctxVoterID, exists := c.Get("voter_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "ไม่พบข้อมูลยืนยันตัวตน"})
+			return
+		}
+		voterID, ok := ctxVoterID.(uint)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "เกิดข้อผิดพลาดภายในระบบ"})
+			return
+		}
+		var voter models.Voter
+		if err := db.Preload("Area.Province").First(&voter, voterID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลผู้มีสิทธิ์"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"voter_id":     voter.ID,
+			"area_id":      voter.AreaID,
+			"area_name":    voter.Area.Province.ProvinceName + " " + voter.Area.AreaName,
+			"province":     voter.Area.Province.ProvinceName,
+			"email":        voter.Email,
+			"phone_number": voter.PhoneNumber,
+			"is_voted":     voter.IsVoted,
+			"voted_at":     voter.VotedAt,
+		})
+	}
+}
+
 // POST /voter/otp-confirm
 // รับ otp_code และ ref_code แล้วยืนยัน OTP
 // ถ้าถูกต้องจะคืน JWT token กลับไป
@@ -88,7 +119,7 @@ func OTPConfirmHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// 4. ส่ง Token กลับไป
-		c.JSON(http.StatusOK, OTPConfirmResponse{Token: result.Token})
+		c.JSON(http.StatusOK, OTPConfirmResponse{Token: result.Token, Role: result.Role})
 	}
 }
 
@@ -118,8 +149,8 @@ func VerifyVoterHandler(db *gorm.DB) gin.HandlerFunc {
 			VoterInfo: VoterInfo{
 				Name:     "ข้อมูลปกปิด",
 				AreaID:   voter.AreaID,
-				AreaName: voter.Area.AreaName,
-				Province: "ไม่ระบุจังหวัด",
+				AreaName: voter.Area.Province.ProvinceName + " " + voter.Area.AreaName,
+				Province: voter.Area.Province.ProvinceName,
 				IsVoted:  voter.IsVoted,
 			},
 		}
@@ -174,8 +205,8 @@ func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// ส่ง OTP ไปยัง email (ถ้าไม่ได้ตั้ง SMTP จะ skip อัตโนมัติ)
-		if err := pkg.SendOTPEmail(voter.Email, otpCode, refCode); err != nil {
+		// ส่ง OTP ผ่าน async email queue
+		if err := pkg.EnqueueOTPEmail(voter.Email, otpCode, refCode); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่"})
 			return
 		}

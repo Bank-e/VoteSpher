@@ -25,7 +25,8 @@ type OTPConfirmRequest struct {
 }
 
 type OTPConfirmResponse struct {
-	Token string `json:"token"` // JWT token
+	Token string `json:"token"`
+	Role  string `json:"role"` // "voter" หรือ "admin"
 }
 
 // POST /voter/otp-request

@@ -9,6 +9,7 @@ import (
 
 // Service คือ business logic layer ของ election
 type Service interface {
+	GetConfig(ctx context.Context) (*ConfigResponse, error)
 	UpdateElectionConfig(ctx context.Context, voterID uint, req UpdateConfigRequest) (*ConfigResponse, error)
 }
 
@@ -30,6 +31,22 @@ const (
 	statusClosed   = "CLOSED"
 	statusCounting = "COUNTING"
 )
+
+// GetConfig ดึงข้อมูลการเลือกตั้งที่ active อยู่ปัจจุบัน
+func (s *service) GetConfig(ctx context.Context) (*ConfigResponse, error) {
+	cfg, err := s.repo.GetActiveConfig(ctx)
+	if err != nil {
+		return nil, internal(ErrConfigNotFound, err)
+	}
+	return &ConfigResponse{
+		ConfigID:  cfg.ID,
+		Status:    cfg.Status,
+		StartTime: cfg.StartTime,
+		EndTime:   cfg.EndTime,
+		UpdatedAt: cfg.UpdatedAt,
+		IsActive:  cfg.IsActive,
+	}, nil
+}
 
 // UpdateElectionConfig อัปเดตการตั้งค่าการเลือกตั้งแบบ Versioning
 func (s *service) UpdateElectionConfig(ctx context.Context, voterID uint, req UpdateConfigRequest) (*ConfigResponse, error) {

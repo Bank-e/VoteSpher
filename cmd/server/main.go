@@ -5,6 +5,7 @@ import (
 	"os"
 	"votespher/config"
 	"votespher/internal/auth"
+	"votespher/pkg"
 	"votespher/internal/election"
 	"votespher/internal/info"
 	"votespher/internal/middleware"
@@ -20,6 +21,9 @@ func main() {
 	// 1. โหลด Environment Variables และเชื่อมต่อ Database
 	config.LoadEnv()
 	db := config.ConnectDB()
+
+	// เริ่ม async email worker pool (3 workers)
+	pkg.StartEmailWorker(3)
 
 	// 2. ตรวจ flag ก่อน run migration
 	if os.Getenv("RUN_MIGRATION") == "true" {
@@ -108,7 +112,9 @@ func main() {
 	protected.Use(middleware.RequireAuth())
 	{
 		protected.GET("/voter/me", auth.VoterMeHandler(db))
-		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.POST("/ballot/submit",
+			middleware.AuditLog(db, "SUBMIT_VOTE"),
+			voteHandler.SubmitBallotHandler())
 		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
 

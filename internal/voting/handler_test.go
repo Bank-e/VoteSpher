@@ -145,8 +145,10 @@ func TestSubmitBallotHandler_InvalidTypeInContext(t *testing.T) {
 	// แกล้งใส่ voter_id เป็นข้อความ (String) แทนที่จะเป็นตัวเลข (uint)
 	c.Set("voter_id", "NOT_A_NUMBER")
 	c.Set("area_id", uint(10))
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
-	
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
 	handler.SubmitBallotHandler()(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
@@ -178,8 +180,10 @@ func TestSubmitBallotHandler_InvalidAreaIDType(t *testing.T) {
 
 	c.Set("voter_id", uint(123))
 	// แกล้งใส่ area_id เป็นข้อความแทนที่จะเป็นตัวเลข
-	c.Set("area_id", "NOT_A_NUMBER") 
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
+	c.Set("area_id", "NOT_A_NUMBER")
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.SubmitBallotHandler()(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -197,7 +201,9 @@ func TestSubmitBallotHandler_GenericError(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Set("voter_id", uint(123))
 	c.Set("area_id", uint(10))
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.SubmitBallotHandler()(c)
 	

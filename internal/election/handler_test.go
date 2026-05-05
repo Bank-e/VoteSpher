@@ -25,6 +25,10 @@ type mockService struct {
 	calledWithReq   UpdateConfigRequest
 }
 
+func (m *mockService) GetConfig(_ context.Context) (*ConfigResponse, error) {
+	return m.resp, m.err
+}
+
 func (m *mockService) UpdateElectionConfig(_ context.Context, voterID uint, req UpdateConfigRequest) (*ConfigResponse, error) {
 	m.calledWithVoter = voterID
 	m.calledWithReq = req

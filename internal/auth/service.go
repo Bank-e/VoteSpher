@@ -17,6 +17,7 @@ import (
 // ผลลัพธ์หลังยืนยัน OTP สำเร็จ
 type OTPConfirmResult struct {
 	Token string
+	Role  string
 }
 
 // ConfirmOTP ยืนยันรหัส OTP แล้วคืน JWT token
@@ -29,7 +30,16 @@ func ConfirmOTP(db *gorm.DB, req OTPConfirmRequest) (*OTPConfirmResult, error) {
 
 	// 2. เช็คว่า otp_code ตรงกับที่บันทึกไว้ไหม
 	if otp.OTPCode != req.OTPCode {
-		return nil, errors.New("รหัส OTP ไม่ถูกต้อง")
+		// นับจำนวนครั้งที่กรอกผิด — block หลัง 5 ครั้ง
+		newAttempts := otp.Attempts + 1
+		update := map[string]interface{}{"attempts": newAttempts}
+		if newAttempts >= 5 {
+			update["is_used"] = true
+			db.Model(otp).Updates(update)
+			return nil, errors.New("กรอก OTP ผิดเกิน 5 ครั้ง รหัสถูกยกเลิกแล้ว กรุณาขอ OTP ใหม่")
+		}
+		db.Model(otp).Updates(update)
+		return nil, fmt.Errorf("รหัส OTP ไม่ถูกต้อง (ครั้งที่ %d/5)", newAttempts)
 	}
 
 	// 3. mark OTP ว่าใช้แล้ว (กันไม่ให้ใช้ซ้ำ)
@@ -43,17 +53,23 @@ func ConfirmOTP(db *gorm.DB, req OTPConfirmRequest) (*OTPConfirmResult, error) {
 		return nil, err
 	}
 
-	// 5. สร้าง JWT Token
+	// 5. ตรวจว่าเป็น admin หรือเปล่า → กำหนด role อัตโนมัติ
+	role := "voter"
+	if IsAdmin(db, voter.ID) {
+		role = "admin"
+	}
+
+	// 6. สร้าง JWT Token
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 	if secretKey == "" {
 		return nil, errors.New("ระบบผิดพลาด กรุณาติดต่อผู้ดูแล")
 	}
-	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, "voter", secretKey)
+	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, role, secretKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return &OTPConfirmResult{Token: token}, nil
+	return &OTPConfirmResult{Token: token, Role: role}, nil
 }
 
 // generateCitizenIDHash เอาไว้ hash citizen_id ก่อนบันทึกลง DB

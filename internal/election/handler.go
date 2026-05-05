@@ -17,6 +17,19 @@ func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// GetConfig — GET /election/config (public)
+func (h *Handler) GetConfig(c *gin.Context) {
+	result, err := h.svc.GetConfig(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   result,
+	})
+}
+
 // UpdateConfig — PATCH /election/config
 // อัปเดตการตั้งค่าการเลือกตั้ง (สิทธิ์ admin ถูกควบคุมจาก Middleware แล้ว)
 func (h *Handler) UpdateConfig(c *gin.Context) {

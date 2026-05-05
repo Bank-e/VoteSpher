@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestBuildResponse(t *testing.T) {
+func TestBuildResponseBasic(t *testing.T) {
 
 	rows := []AreaVoteRow{
 		{AreaID: 1, AreaName: "A", TotalVotes: 100},
