@@ -1,0 +1,88 @@
+{"Time":"2026-04-27T18:05:35.0849926+07:00","Action":"start","Package":"votespher/internal/election"}
+{"Time":"2026-04-27T18:05:35.1528356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_Success"}
+{"Time":"2026-04-27T18:05:35.1528356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_Success","Output":"=== RUN   TestHandler_Success\n"}
+{"Time":"2026-04-27T18:05:35.1533358+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_Success","Output":"--- PASS: TestHandler_Success (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1533358+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_Success","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_InvalidJSON"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_InvalidJSON","Output":"=== RUN   TestHandler_InvalidJSON\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_InvalidJSON","Output":"--- PASS: TestHandler_InvalidJSON (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_InvalidJSON","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_MissingStatus_FailsValidation"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_MissingStatus_FailsValidation","Output":"=== RUN   TestHandler_MissingStatus_FailsValidation\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_MissingStatus_FailsValidation","Output":"--- PASS: TestHandler_MissingStatus_FailsValidation (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_MissingStatus_FailsValidation","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_MissingVoterID"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_MissingVoterID","Output":"=== RUN   TestHandler_MissingVoterID\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_MissingVoterID","Output":"--- PASS: TestHandler_MissingVoterID (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_MissingVoterID","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_VoterIDWrongType"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_VoterIDWrongType","Output":"=== RUN   TestHandler_VoterIDWrongType\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_VoterIDWrongType","Output":"--- PASS: TestHandler_VoterIDWrongType (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_VoterIDWrongType","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_ServiceForbiddenError"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceForbiddenError","Output":"=== RUN   TestHandler_ServiceForbiddenError\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceForbiddenError","Output":"--- PASS: TestHandler_ServiceForbiddenError (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_ServiceForbiddenError","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_ServiceBadRequestError"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceBadRequestError","Output":"=== RUN   TestHandler_ServiceBadRequestError\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceBadRequestError","Output":"--- PASS: TestHandler_ServiceBadRequestError (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_ServiceBadRequestError","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestHandler_ServiceInternalError"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceInternalError","Output":"=== RUN   TestHandler_ServiceInternalError\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestHandler_ServiceInternalError","Output":"--- PASS: TestHandler_ServiceInternalError (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestHandler_ServiceInternalError","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestNormalizeStatus"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestNormalizeStatus","Output":"=== RUN   TestNormalizeStatus\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestNormalizeStatus","Output":"--- PASS: TestNormalizeStatus (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestNormalizeStatus","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestValidateTimeRange"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateTimeRange","Output":"=== RUN   TestValidateTimeRange\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateTimeRange","Output":"--- PASS: TestValidateTimeRange (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestValidateTimeRange","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestValidateStatus"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateStatus","Output":"=== RUN   TestValidateStatus\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateStatus","Output":"--- PASS: TestValidateStatus (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestValidateStatus","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestValidateStateTransition"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateStateTransition","Output":"=== RUN   TestValidateStateTransition\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestValidateStateTransition","Output":"--- PASS: TestValidateStateTransition (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestValidateStateTransition","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_Success"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_Success","Output":"=== RUN   TestUpdateElectionConfig_Success\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_Success","Output":"--- PASS: TestUpdateElectionConfig_Success (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_Success","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NotAdmin"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NotAdmin","Output":"=== RUN   TestUpdateElectionConfig_NotAdmin\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NotAdmin","Output":"--- PASS: TestUpdateElectionConfig_NotAdmin (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NotAdmin","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidStatus"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidStatus","Output":"=== RUN   TestUpdateElectionConfig_InvalidStatus\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidStatus","Output":"--- PASS: TestUpdateElectionConfig_InvalidStatus (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidStatus","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidTimeRange"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidTimeRange","Output":"=== RUN   TestUpdateElectionConfig_InvalidTimeRange\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidTimeRange","Output":"--- PASS: TestUpdateElectionConfig_InvalidTimeRange (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_InvalidTimeRange","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NoActiveConfig"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NoActiveConfig","Output":"=== RUN   TestUpdateElectionConfig_NoActiveConfig\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NoActiveConfig","Output":"--- PASS: TestUpdateElectionConfig_NoActiveConfig (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NoActiveConfig","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_ClosedToOpenForbidden"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_ClosedToOpenForbidden","Output":"=== RUN   TestUpdateElectionConfig_ClosedToOpenForbidden\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_ClosedToOpenForbidden","Output":"--- PASS: TestUpdateElectionConfig_ClosedToOpenForbidden (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_ClosedToOpenForbidden","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryFailurePropagatesAppError"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryFailurePropagatesAppError","Output":"=== RUN   TestUpdateElectionConfig_RepositoryFailurePropagatesAppError\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryFailurePropagatesAppError","Output":"--- PASS: TestUpdateElectionConfig_RepositoryFailurePropagatesAppError (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryFailurePropagatesAppError","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryRawErrorWrapped"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryRawErrorWrapped","Output":"=== RUN   TestUpdateElectionConfig_RepositoryRawErrorWrapped\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryRawErrorWrapped","Output":"--- PASS: TestUpdateElectionConfig_RepositoryRawErrorWrapped (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_RepositoryRawErrorWrapped","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"run","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NormalizesLowercaseStatus"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NormalizesLowercaseStatus","Output":"=== RUN   TestUpdateElectionConfig_NormalizesLowercaseStatus\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NormalizesLowercaseStatus","Output":"--- PASS: TestUpdateElectionConfig_NormalizesLowercaseStatus (0.00s)\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"pass","Package":"votespher/internal/election","Test":"TestUpdateElectionConfig_NormalizesLowercaseStatus","Elapsed":0}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Output":"PASS\n"}
+{"Time":"2026-04-27T18:05:35.1618356+07:00","Action":"output","Package":"votespher/internal/election","Output":"ok  \tvotespher/internal/election\t0.076s\n"}
+{"Time":"2026-04-27T18:05:35.1673356+07:00","Action":"pass","Package":"votespher/internal/election","Elapsed":0.082}

@@ -1,0 +1,516 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>election: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">votespher/internal/election/errors.go (100.0%)</option>
+				
+				<option value="file1">votespher/internal/election/handler.go (100.0%)</option>
+				
+				<option value="file2">votespher/internal/election/repository.go (100.0%)</option>
+				
+				<option value="file3">votespher/internal/election/service.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package election
+
+import (
+        "errors"
+        "fmt"
+        "net/http"
+)
+
+// AppError คือ error type ที่ผูก HTTP status code มากับข้อความให้เลย
+// ทำให้ handler ไม่ต้อง parse string เพื่อหาว่า error นี้ควรตอบ HTTP code อะไร
+type AppError struct {
+        Code    int    // HTTP status code (เช่น 400, 403, 500)
+        Message string // ข้อความที่ปลอดภัยที่จะส่งให้ client
+        Err     error  // error ตัวจริง (เก็บไว้ wrap ไม่ส่งออกให้ client)
+}
+
+// Error ทำให้ AppError implement interface error ได้
+func (e *AppError) Error() string <span class="cov8" title="1">{
+        if e.Err != nil </span><span class="cov8" title="1">{
+                return fmt.Sprintf("%s: %v", e.Message, e.Err)
+        }</span>
+        <span class="cov8" title="1">return e.Message</span>
+}
+
+// Unwrap ทำให้ใช้ errors.Is / errors.As ตรวจกับ inner error ได้
+func (e *AppError) Unwrap() error <span class="cov8" title="1">{
+        return e.Err
+}</span>
+
+// HTTPStatus คืนค่า status code (ไว้ให้ handler หยิบมาใช้)
+func (e *AppError) HTTPStatus() int <span class="cov8" title="1">{
+        if e.Code == 0 </span><span class="cov8" title="1">{
+                return http.StatusInternalServerError
+        }</span>
+        <span class="cov8" title="1">return e.Code</span>
+}
+
+// helper สร้าง AppError แบบเร็ว
+func newAppError(code int, message string, cause error) *AppError <span class="cov8" title="1">{
+        return &amp;AppError{Code: code, Message: message, Err: cause}
+}</span>
+
+// AsAppError ดึง *AppError ออกจาก error chain
+// คืน (nil, false) ถ้าไม่ใช่ AppError
+func AsAppError(err error) (*AppError, bool) <span class="cov8" title="1">{
+        var appErr *AppError
+        if errors.As(err, &amp;appErr) </span><span class="cov8" title="1">{
+                return appErr, true
+        }</span>
+        <span class="cov8" title="1">return nil, false</span>
+}
+
+// ============================================================
+// Sentinel errors — ใช้เป็น "ชนิด" ของ error เพื่อให้ test/compare ได้
+// ============================================================
+
+var (
+        // 400 — input ไม่ถูก
+        ErrInvalidRequest         = errors.New("request body ไม่ถูกต้อง")
+        ErrStatusRequired         = errors.New("กรุณาระบุ status")
+        ErrInvalidStatus          = errors.New("status ไม่ถูกต้อง: รองรับเฉพาะ PREPARE, OPEN, PAUSED, CLOSED, COUNTING")
+        ErrInvalidTimeRange       = errors.New("เวลาเปิดหีบต้องมาก่อนเวลาปิดหีบเสมอ")
+        ErrInvalidStateTransition = errors.New("ไม่อนุญาตให้เปิดหีบใหม่ เนื่องจากระบบถูกปิด (CLOSED) ไปแล้ว")
+
+        // 401/403 — สิทธิ์
+        ErrUnauthorized = errors.New("ไม่พบข้อมูลยืนยันตัวตนใน Token")
+        ErrInvalidToken = errors.New("ข้อมูลยืนยันตัวตนไม่ถูกต้อง")
+        ErrNotAdmin     = errors.New("คุณไม่มีสิทธิ์ผู้ดูแลระบบ")
+
+        // 500 — ระบบ
+        ErrConfigNotFound     = errors.New("ไม่พบการตั้งค่าระบบที่กำลังใช้งานอยู่")
+        ErrConfigUpdateFailed = errors.New("ไม่สามารถบันทึกการตั้งค่าใหม่ได้")
+        ErrConfigDeactivate   = errors.New("ไม่สามารถยกเลิกการตั้งค่าเดิมได้")
+)
+
+// ============================================================
+// Constructor helpers — รวมตำแหน่งสร้าง AppError ที่ใช้บ่อย
+// ============================================================
+
+func badRequest(sentinel error) *AppError <span class="cov8" title="1">{
+        return newAppError(http.StatusBadRequest, sentinel.Error(), sentinel)
+}</span>
+
+func unauthorized(sentinel error) *AppError <span class="cov8" title="1">{
+        return newAppError(http.StatusUnauthorized, sentinel.Error(), sentinel)
+}</span>
+
+func forbidden(sentinel error) *AppError <span class="cov8" title="1">{
+        return newAppError(http.StatusForbidden, sentinel.Error(), sentinel)
+}</span>
+
+func internal(sentinel error, cause error) *AppError <span class="cov8" title="1">{
+        // เก็บ sentinel ไว้ใน chain เสมอ เพื่อให้ errors.Is(err, sentinel) ทำงานได้
+        // ถ้ามี cause ด้วยให้ wrap sentinel + cause เข้าด้วยกัน
+        err := error(sentinel)
+        if cause != nil </span><span class="cov8" title="1">{
+                err = fmt.Errorf("%w: %v", sentinel, cause)
+        }</span>
+        <span class="cov8" title="1">return newAppError(http.StatusInternalServerError, sentinel.Error(), err)</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package election
+
+import (
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+)
+
+// Handler คือ HTTP layer ของ election
+// รับ Service เป็น dependency เพื่อให้ test สามารถใส่ mock service เข้ามาได้
+type Handler struct {
+        svc Service
+}
+
+// NewHandler สร้าง Handler ใหม่จาก Service
+func NewHandler(svc Service) *Handler <span class="cov8" title="1">{
+        return &amp;Handler{svc: svc}
+}</span>
+
+// UpdateConfig — PATCH /election/config
+// อัปเดตการตั้งค่าการเลือกตั้ง (สิทธิ์ admin ถูกควบคุมจาก Middleware แล้ว)
+func (h *Handler) UpdateConfig(c *gin.Context) <span class="cov8" title="1">{
+        // 1. parse request body
+        var req UpdateConfigRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                respondError(c, badRequest(ErrInvalidRequest))
+                return
+        }</span>
+
+        // 2. ดึง voter_id จาก Token (ที่ Middleware ใส่ไว้ให้)
+        <span class="cov8" title="1">voterID, err := extractVoterID(c)
+        if err != nil </span><span class="cov8" title="1">{
+                respondError(c, err)
+                return
+        }</span>
+
+        // 3. ส่งต่อให้ service
+        <span class="cov8" title="1">result, err := h.svc.UpdateElectionConfig(c.Request.Context(), voterID, req)
+        if err != nil </span><span class="cov8" title="1">{
+                respondError(c, err)
+                return
+        }</span>
+
+        // 4. success
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{
+                "status":  "success",
+                "message": "อัปเดตการตั้งค่าระบบเลือกตั้งเรียบร้อยแล้ว",
+                "data":    result,
+        })</span>
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+// extractVoterID ดึง voter_id ที่ middleware ใส่ไว้ใน gin.Context
+// ถ้าไม่มีหรือ type ผิด จะคืน *AppError ที่ map กับ HTTP code ให้เรียบร้อย
+func extractVoterID(c *gin.Context) (uint, error) <span class="cov8" title="1">{
+        ctxVoterID, exists := c.Get("voter_id")
+        if !exists </span><span class="cov8" title="1">{
+                return 0, unauthorized(ErrUnauthorized)
+        }</span>
+
+        <span class="cov8" title="1">voterID, ok := ctxVoterID.(uint)
+        if !ok </span><span class="cov8" title="1">{
+                return 0, internal(ErrInvalidToken, nil)
+        }</span>
+
+        <span class="cov8" title="1">return voterID, nil</span>
+}
+
+// respondError แปลง error เป็น HTTP response
+// — ถ้าเป็น *AppError จะใช้ HTTPStatus ที่ติดมากับ error
+// — ถ้าไม่ใช่ จะ fallback เป็น 500
+//
+// ทำให้ handler ไม่ต้อง parse string เพื่อหา status code อีกต่อไป
+func respondError(c *gin.Context, err error) <span class="cov8" title="1">{
+        if appErr, ok := AsAppError(err); ok </span><span class="cov8" title="1">{
+                c.JSON(appErr.HTTPStatus(), gin.H{"error": appErr.Message})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package election
+
+import (
+        "context"
+        "votespher/internal/models"
+
+        "gorm.io/gorm"
+)
+
+// Repository คือสัญญา (contract) ของ Data Access Layer ของ election
+// การประกาศเป็น interface ทำให้ Service สามารถใช้ mock ใน unit test ได้
+// โดยไม่ต้องสปินดาต้าเบสจริง
+type Repository interface {
+        GetAdminByVoterID(ctx context.Context, voterID uint) (*models.Admin, error)
+        GetActiveConfig(ctx context.Context) (*models.SystemConfig, error)
+        CreateConfigVersion(ctx context.Context, oldConfig, newConfig *models.SystemConfig) error
+}
+
+// repository คือ implementation จริงของ Repository (พึ่งพา *gorm.DB)
+// ตัวเล็กเพื่อบังคับให้คนใช้ผ่าน NewRepository ที่คืน interface
+type repository struct {
+        db *gorm.DB
+}
+
+// NewRepository สร้าง Repository ใหม่จาก *gorm.DB
+func NewRepository(db *gorm.DB) Repository <span class="cov8" title="1">{
+        return &amp;repository{db: db}
+}</span>
+
+// GetAdminByVoterID ค้นหาข้อมูลแอดมินจากรหัสผู้โหวต
+func (r *repository) GetAdminByVoterID(ctx context.Context, voterID uint) (*models.Admin, error) <span class="cov8" title="1">{
+        var admin models.Admin
+        if err := r.db.WithContext(ctx).Where("voter_id = ?", voterID).First(&amp;admin).Error; err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;admin, nil</span>
+}
+
+// GetActiveConfig หา config ที่ active อยู่ตัวล่าสุด
+// แนะนำให้ใช้ ? แทน true เผื่อสลับใช้ Database ต่างค่ายกัน (เช่น MySQL ใช้ 1/0)
+func (r *repository) GetActiveConfig(ctx context.Context) (*models.SystemConfig, error) <span class="cov8" title="1">{
+        var cfg models.SystemConfig
+        if err := r.db.WithContext(ctx).Where("is_active = ?", true).First(&amp;cfg).Error; err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;cfg, nil</span>
+}
+
+// CreateConfigVersion ยกเลิกของเก่าและสร้างของใหม่แบบ Transaction
+//
+// ขั้นตอน:
+//  1. set is_active = false ของ config เก่า
+//  2. insert config ใหม่
+//
+// ถ้าขั้นใดขั้นหนึ่งล้มเหลว จะ rollback ทั้งหมด
+func (r *repository) CreateConfigVersion(ctx context.Context, oldConfig, newConfig *models.SystemConfig) error <span class="cov8" title="1">{
+        return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error </span><span class="cov8" title="1">{
+                // 1. ยกเลิกของเก่า (set is_active = false)
+                if err := tx.Model(oldConfig).Update("is_active", false).Error; err != nil </span><span class="cov8" title="1">{
+                        return internal(ErrConfigDeactivate, err)
+                }</span>
+
+                // 2. บันทึกของใหม่ (Insert row ใหม่)
+                <span class="cov8" title="1">if err := tx.Create(newConfig).Error; err != nil </span><span class="cov8" title="1">{
+                        return internal(ErrConfigUpdateFailed, err)
+                }</span>
+
+                <span class="cov8" title="1">return nil</span>
+        })
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package election
+
+import (
+        "context"
+        "strings"
+        "time"
+        "votespher/internal/models"
+)
+
+// Service คือ business logic layer ของ election
+// แยก interface จาก implementation เพื่อให้ handler สามารถ mock ได้
+type Service interface {
+        UpdateElectionConfig(ctx context.Context, voterID uint, req UpdateConfigRequest) (*ConfigResponse, error)
+}
+
+// service เก็บ dependencies ที่ business logic ต้องใช้
+// ตัวเล็กเพื่อบังคับให้คนใช้ผ่าน NewService
+type service struct {
+        repo Repository
+}
+
+// NewService สร้าง Service ใหม่จาก Repository
+func NewService(repo Repository) Service <span class="cov8" title="1">{
+        return &amp;service{repo: repo}
+}</span>
+
+// statusXxx เป็น constant แทนการเขียน string ดิบ — ลดโอกาสพิมพ์ผิด
+const (
+        statusPrepare  = "PREPARE"
+        statusOpen     = "OPEN"
+        statusPaused   = "PAUSED"
+        statusClosed   = "CLOSED"
+        statusCounting = "COUNTING"
+)
+
+// UpdateElectionConfig อัปเดตการตั้งค่าการเลือกตั้งแบบ Versioning
+//
+// ขั้นตอน:
+//  1. ตรวจสอบสิทธิ์ admin จาก voterID
+//  2. validate request (status, time range)
+//  3. ดึง config เดิมที่ active อยู่
+//  4. ตรวจสอบ state machine
+//  5. สร้าง config ใหม่และยกเลิกของเก่าใน transaction เดียว
+func (s *service) UpdateElectionConfig(ctx context.Context, voterID uint, req UpdateConfigRequest) (*ConfigResponse, error) <span class="cov8" title="1">{
+        // 1. เช็คสิทธิ์แอดมิน
+        admin, err := s.repo.GetAdminByVoterID(ctx, voterID)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, forbidden(ErrNotAdmin)
+        }</span>
+
+        // 2. normalize + validate request
+        <span class="cov8" title="1">newStatus := normalizeStatus(req.Status)
+        if err := validateStatus(newStatus); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if err := validateTimeRange(req.StartTime, req.EndTime); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        // 3. ดึง config ที่ active อยู่ปัจจุบัน
+        <span class="cov8" title="1">cfg, err := s.repo.GetActiveConfig(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, internal(ErrConfigNotFound, err)
+        }</span>
+
+        // 4. State Machine — ป้องกัน transition ที่ไม่ถูกต้อง
+        <span class="cov8" title="1">if err := validateStateTransition(cfg.Status, newStatus); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        // 5. เตรียมข้อมูล Config ชุดใหม่ (ประทับตรา adminID ลงไป)
+        <span class="cov8" title="1">newConfig := models.SystemConfig{
+                AdminID:   admin.ID,
+                Status:    newStatus,
+                StartTime: req.StartTime,
+                EndTime:   req.EndTime,
+                IsActive:  true,
+                // ฟิลด์ ID และ UpdatedAt จะถูก GORM สร้างให้อัตโนมัติ
+        }
+
+        // 6. บันทึกแบบ Transaction
+        if err := s.repo.CreateConfigVersion(ctx, cfg, &amp;newConfig); err != nil </span><span class="cov8" title="1">{
+                // ถ้า repo คืน *AppError มาแล้ว ส่งต่อตรงๆ
+                if _, ok := AsAppError(err); ok </span><span class="cov8" title="1">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">return nil, internal(ErrConfigUpdateFailed, err)</span>
+        }
+
+        // 7. คืนค่า config ที่อัปเดตแล้ว
+        <span class="cov8" title="1">return &amp;ConfigResponse{
+                ConfigID:  newConfig.ID,
+                Status:    newConfig.Status,
+                StartTime: newConfig.StartTime,
+                EndTime:   newConfig.EndTime,
+                UpdatedAt: newConfig.UpdatedAt,
+                IsActive:  newConfig.IsActive,
+        }, nil</span>
+}
+
+// ============================================================
+// Helpers — แยกออกมาเพื่อเขียน test ทีละชิ้นได้สะดวก
+// ============================================================
+
+// normalizeStatus แปลง status ให้เป็นตัวพิมพ์ใหญ่ทั้งหมด
+// ป้องกันคนพิมพ์สลับ (เช่น Open, open, OPEN ให้เท่ากันหมด)
+func normalizeStatus(status string) string <span class="cov8" title="1">{
+        return strings.ToUpper(strings.TrimSpace(status))
+}</span>
+
+// allowedStatuses คือเซตของ status ที่ระบบรองรับ
+var allowedStatuses = map[string]struct{}{
+        statusPrepare:  {},
+        statusOpen:     {},
+        statusPaused:   {},
+        statusClosed:   {},
+        statusCounting: {},
+}
+
+// validateStatus ตรวจว่าค่า status (ที่ normalize แล้ว) อยู่ในชุดที่รองรับ
+func validateStatus(status string) error <span class="cov8" title="1">{
+        if _, ok := allowedStatuses[status]; !ok </span><span class="cov8" title="1">{
+                return badRequest(ErrInvalidStatus)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// validateTimeRange ตรวจสอบว่าเวลาเริ่มต้น &lt; เวลาสิ้นสุด
+func validateTimeRange(start, end time.Time) error <span class="cov8" title="1">{
+        if start.After(end) || start.Equal(end) </span><span class="cov8" title="1">{
+                return badRequest(ErrInvalidTimeRange)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// validateStateTransition ตรวจสอบกฎ state machine
+//
+// PREPARE --&gt; OPEN
+// OPEN    --&gt; PAUSED, CLOSED
+// PAUSED  --&gt; OPEN
+// CLOSED  --&gt; COUNTING (ห้ามกลับไป OPEN เด็ดขาด!)
+func validateStateTransition(oldStatus, newStatus string) error <span class="cov8" title="1">{
+        if oldStatus == statusClosed &amp;&amp; newStatus == statusOpen </span><span class="cov8" title="1">{
+                return badRequest(ErrInvalidStateTransition)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

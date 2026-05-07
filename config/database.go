@@ -15,19 +15,18 @@ import (
 )
 
 func LoadEnv() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️ .env not found, using system env instead")
 	}
 }
 
 func ConnectDB() *gorm.DB {
-	host     := os.Getenv("DB_HOST")
-	port     := os.Getenv("DB_PORT")
-	user     := os.Getenv("DB_USER")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
-	dbname   := os.Getenv("DB_NAME")
-	caCert   := os.Getenv("DB_CA_CERT")
+	dbname := os.Getenv("DB_NAME")
+	caCert := os.Getenv("DB_CA_CERT")
 
 	// โหลด CA Certificate
 	rootCertPool := x509.NewCertPool()

@@ -32,6 +32,7 @@ func main() {
 
 	r := gin.Default()
 
+<<<<<<< HEAD
 	// ==========================================
 	// 📌 Dependency Injection (DI) Setup
 	// ==========================================
@@ -79,6 +80,43 @@ func main() {
 	// ==========================================
 	// 📌 Admin Routes
 	// ==========================================
+=======
+	voteRepo := voting.NewVotingRepository(db)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
+
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
+
+	resultRepo := result.NewResultRepository(db)
+	resultService := result.NewResultService(resultRepo)
+	resultHandler := result.NewResultHandler(resultService)
+
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
+
+	r.POST("/dev/mock-token", auth.MockTokenHandler())
+
+	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
+	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
+
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
+
+	r.GET("/results/area/:id", resultHandler.GetAreaResult)
+	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
+	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
+
+	protected := r.Group("/")
+	protected.Use(middleware.RequireAuth())
+	{
+		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
+	}
+
+>>>>>>> e4a160189aca1a94396bb88f87428eb0df414f09
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
