@@ -6,7 +6,10 @@ import (
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
+	"votespher/internal/info"
 	"votespher/internal/middleware"
+	"votespher/internal/realtime"
+	"votespher/internal/result"
 	"votespher/internal/voting"
 	"votespher/migration"
 
@@ -14,58 +17,74 @@ import (
 )
 
 func main() {
-	// 1. โหลด Environment Variables และเชื่อมต่อ Database
 	config.LoadEnv()
 	db := config.ConnectDB()
 
-	// 2. ตรวจ flag ก่อน run migration
 	if os.Getenv("RUN_MIGRATION") == "true" {
 		migration.Run(db)
 		return
 	}
 
-	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ)
 	if os.Getenv("RUN_SEED") == "true" {
 		migration.SeedData(db)
 		return
 	}
 
-	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
 	// ==========================================
-	// 🟢 Public Routes (ไม่ต้องใช้ Token)
+	// 📌 Dependency Injection (DI) Setup
 	// ==========================================
 
-	// แก้เป็น r.POST และเอา gin.WrapH ออก เพราะเป็น Gin Handler แล้ว
-	r.POST("/dev/mock-token", auth.MockTokenHandler())
+	// 👉 DI ของ Election (เพื่อนทำเสร็จแล้ว ใช้ได้ปกติ)
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
 
-	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
-	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
-	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
+	// 👉 DI ของ Auth ที่ฟูจิเพิ่ง Refactor เสร็จ (สมบูรณ์ 100%)
+	authRepo := auth.NewAuthRepository(db)
+	authService := auth.NewAuthService(authRepo)
+	authHandler := auth.NewAuthHandler(authService)
 
-	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
-	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
+	// ❌ เอา DI ของ voting, info, result ออกไป เพราะไฟล์ของเพื่อนยังไม่รองรับระบบนี้
 
 	// ==========================================
-	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
+	// 📌 Public Routes
+	// ==========================================
+
+	// ✅ Auth Routes (ใช้ระบบใหม่ที่ฟูจิทำ ไม่มีเส้น MockToken แล้ว)
+	r.POST("/voter/verify", authHandler.VerifyVoter)
+	r.POST("/voter/otp-request", authHandler.OTPRequest)
+	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
+
+	// ⚠️ Info & Result Routes (กลับไปใช้โค้ดแบบเก่าของเพื่อนไปก่อน จะได้ไม่ Error)
+	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(info.GetPartiesHandler()))
+
+	r.GET("/results/area/:id", result.GetAreaResultHandler(db))
+	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
+	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
+
+	// ==========================================
+	// 📌 Protected Routes (Require Login)
 	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
-		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db)) // เช็คชื่อฟังก์ชันให้ตรงกับที่คุณตั้งใน voting/handler.go นะครับ
+		// ⚠️ Voting Routes (กลับไปใช้โค้ดแบบเก่าของเพื่อน)
+		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db))
+		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db))
 	}
 
 	// ==========================================
-	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
+	// 📌 Admin Routes
 	// ==========================================
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
-		admin.PATCH("/election/config", election.UpdateConfigHandler(db)) // ใช้ PATCH หรือ PUT ตามที่คุณออกแบบไว้
+		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
-	// Start Server
 	log.Println("Server is running on port 8080...")
 	r.Run(":8080")
 }
