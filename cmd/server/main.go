@@ -32,58 +32,16 @@ func main() {
 
 	r := gin.Default()
 
-<<<<<<< HEAD
 	// ==========================================
-	// 📌 Dependency Injection (DI) Setup
+	// Dependency Injection (DI) Setup
 	// ==========================================
-
-	// 👉 DI ของ Election (เพื่อนทำเสร็จแล้ว ใช้ได้ปกติ)
-	electionRepo := election.NewRepository(db)
-	electionSvc := election.NewService(electionRepo)
-	electionHandler := election.NewHandler(electionSvc)
-
-	// 👉 DI ของ Auth ที่ฟูจิเพิ่ง Refactor เสร็จ (สมบูรณ์ 100%)
 	authRepo := auth.NewAuthRepository(db)
 	authService := auth.NewAuthService(authRepo)
 	authHandler := auth.NewAuthHandler(authService)
 
-	// ❌ เอา DI ของ voting, info, result ออกไป เพราะไฟล์ของเพื่อนยังไม่รองรับระบบนี้
-
-	// ==========================================
-	// 📌 Public Routes
-	// ==========================================
-
-	// ✅ Auth Routes (ใช้ระบบใหม่ที่ฟูจิทำ ไม่มีเส้น MockToken แล้ว)
-	r.POST("/voter/verify", authHandler.VerifyVoter)
-	r.POST("/voter/otp-request", authHandler.OTPRequest)
-	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
-
-	// ⚠️ Info & Result Routes (กลับไปใช้โค้ดแบบเก่าของเพื่อนไปก่อน จะได้ไม่ Error)
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler()))
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler()))
-
-	r.GET("/results/area/:id", result.GetAreaResultHandler(db))
-	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
-	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
-
-	// ==========================================
-	// 📌 Protected Routes (Require Login)
-	// ==========================================
-	protected := r.Group("/")
-	protected.Use(middleware.RequireAuth())
-	{
-		// ⚠️ Voting Routes (กลับไปใช้โค้ดแบบเก่าของเพื่อน)
-		protected.POST("/ballot/submit", voting.SubmitBallotHandler(db))
-		protected.GET("/ballot/status", voting.GetBallotStatusHandler(db))
-	}
-
-	// ==========================================
-	// 📌 Admin Routes
-	// ==========================================
-=======
-	voteRepo := voting.NewVotingRepository(db)
-	voteService := voting.NewVotingService(voteRepo)
-	voteHandler := voting.NewVotingHandler(voteService)
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
 
 	infoRepo := info.NewInfoRepository(db)
 	infoService := info.NewInfoService(infoRepo)
@@ -93,14 +51,16 @@ func main() {
 	resultService := result.NewResultService(resultRepo)
 	resultHandler := result.NewResultHandler(resultService)
 
-	electionRepo := election.NewRepository(db)
-	electionSvc := election.NewService(electionRepo)
-	electionHandler := election.NewHandler(electionSvc)
-
-	r.POST("/dev/mock-token", auth.MockTokenHandler())
-
-	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
-	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
+	voteRepo := voting.NewVotingRepository(db)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
+	
+	// ==========================================
+	// Public Routes
+	// ==========================================
+	r.POST("/voter/verify", authHandler.VerifyVoter)
+	r.POST("/voter/otp-request", authHandler.OTPRequest)
+	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
 
 	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
@@ -109,6 +69,9 @@ func main() {
 	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
 	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
 
+	// ==========================================
+	// Protected Routes (Require Login)
+	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
@@ -116,7 +79,9 @@ func main() {
 		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
 
->>>>>>> e4a160189aca1a94396bb88f87428eb0df414f09
+	// ==========================================
+	// 📌 Admin Routes
+	// ==========================================
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
