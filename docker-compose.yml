@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  # ==========================================
+  # go API Service
+  # ==========================================
+  api:
+    build: . # บอกให้ไปอ่าน Dockerfile ในโฟลเดอร์นี้
+    container_name: votespher-api
+    restart: always
+    ports:
+      - "8080:8080" # แมปพอร์ต 8080 ของเครื่องเราเข้ากับ API
+    env_file:
+      - .env # โยนตัวแปรทั้งหมดใน .env เข้าไปใน Container
+    depends_on:
+      - db # บอกว่าต้องรอให้ db รันขึ้นมาก่อน ค่อยรัน api
+    # (สำคัญมาก!) เนื่องจาก API รันใน Docker แล้ว มันจะมองไม่เห็น 127.0.0.1 ของเครื่องเรา
+    # เราจึงต้องทับค่า LOCAL_DB_HOST ให้ชี้ไปที่ชื่อ service ของฐานข้อมูลแทน (คือคำว่า "db")
+    environment:
+      LOCAL_DB_HOST: db
+      LOCAL_DB_PORT: 3306
+
+  # ==========================================
+  # ฐานข้อมูล MySQL Service
+  # ==========================================
+  db:
+    image: mysql:8.0 # ดึง Image MySQL เวอร์ชั่น 8.0 มาใช้งาน
+    container_name: votespher-mysql-local
+    restart: always # ให้เปิดตัวเองขึ้นมาใหม่ถ้าพัง หรือตอนเปิดเครื่อง
+    environment:
+      TZ: Asia/Bangkok # ตั้ง Timezone ให้ตรงกับประเทศไทย
+      MYSQL_ROOT_PASSWORD: yourpassword # ตั้งรหัสผ่าน root ตรงนี้ให้ตรงกับใน .env
+      MYSQL_DATABASE: votespher_db # ให้สร้าง Database ชื่อนี้ให้เลย
+    ports:
+      - "3307:3306" # แมปพอร์ต 3307 ในเครื่องเรา ให้ตรงกับ 3306 ใน Container
+    volumes:
+      - mysql_data:/var/lib/mysql # ทำ Volume เพื่อเซฟข้อมูลลงเครื่องเรา ป้องกันข้อมูลหายเวลาปิด Container
+
+volumes:
+  mysql_data:
