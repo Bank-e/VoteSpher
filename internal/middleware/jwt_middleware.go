@@ -5,8 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"votespher/pkg"
+
+	"github.com/gin-gonic/gin"
 )
 
 // 1. ด่านตรวจ Token
@@ -25,7 +26,6 @@ func RequireAuth() gin.HandlerFunc {
 		claims, err := pkg.ValidateToken(tokenStr, os.Getenv("JWT_SECRET_KEY"))
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error_code": "UNAUTHORIZED",
 				"message":    "token ไม่ถูกต้องหรือหมดอายุ",
 			})
 			return
@@ -43,9 +43,10 @@ func RequireAuth() gin.HandlerFunc {
 func RequireRole(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, _ := c.Get("role")
-		if userRole != requiredRole {
+		
+		// แปลงเป็นตัวเล็กทั้งคู่เพื่อป้องกัน Error จากพิมพ์เล็ก/ใหญ่
+		if !strings.EqualFold(userRole.(string), requiredRole) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"error_code": "FORBIDDEN",
 				"message":    "ไม่มีสิทธิ์เข้าถึง",
 			})
 			return

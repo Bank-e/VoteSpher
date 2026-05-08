@@ -13,6 +13,7 @@ type AuthRepository interface {
 	FindVoterByID(voterID uint) (*models.Voter, error)
 	FindVoterByCitizenIDHash(citizenIDHash string) (*models.Voter, error)
 	CreateOTP(otp *models.OTP) error
+	CheckIsAdmin(voterID uint) (bool)
 }
 
 type authRepository struct {
@@ -59,4 +60,11 @@ func (r *authRepository) FindVoterByCitizenIDHash(citizenIDHash string) (*models
 
 func (r *authRepository) CreateOTP(otp *models.OTP) error {
 	return r.db.Create(otp).Error
+}
+
+// CheckIsAdmin ตรวจสอบว่าผู้โหวตคนนี้เป็นแอดมินหรือไม่
+func (r *authRepository) CheckIsAdmin(voterID uint) bool {
+    var count int64
+    r.db.Model(&models.Admin{}).Where("voter_id = ?", voterID).Count(&count)
+    return count > 0
 }
