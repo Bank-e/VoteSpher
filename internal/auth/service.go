@@ -47,8 +47,15 @@ func (s *authService) ConfirmOTP(req OTPConfirmRequest) (string, error) {
 		return "", err
 	}
 
+	role := "voter" // ค่าเริ่มต้น
+    
+    // เรียกใช้ฟังก์ชันที่เราเพิ่งแก้
+    if s.repo.CheckIsAdmin(voter.ID) {
+        role = "admin"
+    }
+
 	secretKey := os.Getenv("JWT_SECRET_KEY")
-	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, "voter", secretKey)
+	token, err := pkg.GenerateToken(voter.ID, voter.AreaID, role, secretKey)
 	if err != nil {
 		return "", err
 	}
