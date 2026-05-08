@@ -80,7 +80,7 @@ func main() {
 	}
 
 	// ==========================================
-	// 📌 Admin Routes
+	// Admin Routes
 	// ==========================================
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
