@@ -17,56 +17,60 @@ import (
 )
 
 func main() {
-	// 1. โหลด Environment Variables และเชื่อมต่อ Database
 	config.LoadEnv()
 	db := config.ConnectDB()
 
-	// 2. ตรวจ flag ก่อน run migration
 	if os.Getenv("RUN_MIGRATION") == "true" {
 		migration.Run(db)
 		return
 	}
 
-	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ)
 	if os.Getenv("RUN_SEED") == "true" {
 		migration.SeedData(db)
 		return
 	}
 
-	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
-	// Refactor Layered Architecture
+	// ==========================================
+	// Dependency Injection (DI) Setup
+	// ==========================================
+	authRepo := auth.NewAuthRepository(db)
+	authService := auth.NewAuthService(authRepo)
+	authHandler := auth.NewAuthHandler(authService)
+
+	electionRepo := election.NewRepository(db)
+	electionSvc := election.NewService(electionRepo)
+	electionHandler := election.NewHandler(electionSvc)
+
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
+
+	resultRepo := result.NewResultRepository(db)
+	resultService := result.NewResultService(resultRepo)
+	resultHandler := result.NewResultHandler(resultService)
+
 	voteRepo := voting.NewVotingRepository(db)
 	voteService := voting.NewVotingService(voteRepo)
 	voteHandler := voting.NewVotingHandler(voteService)
-
+	
 	// ==========================================
-	// 🟢 Public Routes (ไม่ต้องใช้ Token)
+	// Public Routes
 	// ==========================================
+	r.POST("/voter/verify", authHandler.VerifyVoter)
+	r.POST("/voter/otp-request", authHandler.OTPRequest)
+	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
 
-	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
-	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
-	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
+	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
+	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
-	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
-	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
-
-	// ยืนยันรหัส OTP ที่ได้รับมา ถ้าถูกต้องจะคืน JWT token กลับไป
-	r.POST("/voter/otp-confirm", auth.OTPConfirmHandler(db))
-
-	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
-
-	r.GET("/parties", gin.WrapH(info.GetPartiesHandler(db)))
-
-	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
-	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
+	r.GET("/results/area/:id", resultHandler.GetAreaResult)
 	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
-	//เพิ่ทม API สำหรับผลโหวตแบบเรียลไทม์แยกตามเขต
 	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
 
 	// ==========================================
-	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
+	// Protected Routes (Require Login)
 	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
@@ -76,21 +80,14 @@ func main() {
 	}
 
 	// ==========================================
-	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
+	// Admin Routes
 	// ==========================================
-
-	// Wire up election dependencies (repo -> service -> handler)
-	electionRepo := election.NewRepository(db)
-	electionSvc := election.NewService(electionRepo)
-	electionHandler := election.NewHandler(electionSvc)
-
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
 		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
-	// Start Server
 	log.Println("Server is running on port 8080...")
 	r.Run(":8080")
 }
