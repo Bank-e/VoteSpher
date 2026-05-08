@@ -61,14 +61,16 @@ func seedTestData(t *testing.T, db *gorm.DB) {
 	}
 
 	if err := db.Exec(
-		`INSERT INTO candidates (candidate_id, area_id, party_id, candidate_no, full_name) VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO candidates (candidate_id, area_id, party_id, candidate_no, full_name)
+		 VALUES (?, ?, ?, ?, ?)`,
 		1, 1, 1, 1, "นายสมชาย รักชาติ",
 	).Error; err != nil {
 		t.Fatalf("failed to insert candidate 1: %v", err)
 	}
 
 	if err := db.Exec(
-		`INSERT INTO candidates (candidate_id, area_id, party_id, candidate_no, full_name) VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO candidates (candidate_id, area_id, party_id, candidate_no, full_name)
+		 VALUES (?, ?, ?, ?, ?)`,
 		2, 1, 2, 2, "นางสาวสมหญิง มุ่งมั่น",
 	).Error; err != nil {
 		t.Fatalf("failed to insert candidate 2: %v", err)
@@ -89,7 +91,9 @@ func seedTestData(t *testing.T, db *gorm.DB) {
 
 	for _, v := range votes {
 		if err := db.Exec(
-			`INSERT INTO votes (vote_id, area_id, candidate_id, party_id, created_at) VALUES (?, ?, ?, ?, datetime('now'))`,
+			`INSERT INTO votes
+			(vote_id, area_id, candidate_id, party_id, created_at)
+			VALUES (?, ?, ?, ?, datetime('now'))`,
 			v.voteID, v.areaID, v.candidateID, v.partyID,
 		).Error; err != nil {
 			t.Fatalf("failed to insert vote %d: %v", v.voteID, err)
@@ -122,6 +126,15 @@ func TestGetAreaResultHandler_InvalidAreaID(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", w.Code)
 	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if body["error"] == "" {
+		t.Fatal("expected error message but got empty")
+	}
 }
 
 func TestGetAreaResultHandler_AreaNotFound(t *testing.T) {
@@ -135,6 +148,15 @@ func TestGetAreaResultHandler_AreaNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", w.Code)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if body["error"] == "" {
+		t.Fatal("expected error message but got empty")
 	}
 }
 
@@ -160,5 +182,85 @@ func TestGetAreaResultHandler_Success(t *testing.T) {
 
 	if resp.AreaID != 1 {
 		t.Fatalf("expected area_id = 1, got %d", resp.AreaID)
+	}
+
+	if resp.AreaName != "กรุงเทพมหานคร เขต 1" {
+		t.Fatalf("expected area name กรุงเทพมหานคร เขต 1, got %s", resp.AreaName)
+	}
+
+	if len(resp.CandidateResults) != 2 {
+		t.Fatalf("expected 2 candidate results, got %d", len(resp.CandidateResults))
+	}
+
+	if len(resp.PartyListResults) != 2 {
+		t.Fatalf("expected 2 party results, got %d", len(resp.PartyListResults))
+	}
+
+	if resp.CandidateResults[0].Votes != 3 {
+		t.Fatalf("expected first candidate votes = 3, got %d",
+			resp.CandidateResults[0].Votes)
+	}
+}
+
+func TestGetAreaResultHandler_NoVotes(t *testing.T) {
+	db := setupTestDB(t)
+
+	if err := db.Exec(
+		`INSERT INTO areas (area_id, area_name, province_id)
+		 VALUES (?, ?, ?)`,
+		2, "เชียงใหม่ เขต 1", 1,
+	).Error; err != nil {
+		t.Fatalf("failed to insert empty area: %v", err)
+	}
+
+	r := setupRouter(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/results/area/2", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp AreaResultResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(resp.CandidateResults) != 0 {
+		t.Fatalf("expected empty candidate results")
+	}
+}
+
+func TestGetAreaResultHandler_DatabaseError(t *testing.T) {
+	db := setupTestDB(t)
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get sql db: %v", err)
+	}
+
+	sqlDB.Close()
+
+	r := setupRouter(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/results/area/1", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", w.Code)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if body["error"] == "" {
+		t.Fatal("expected error message but got empty")
 	}
 }
