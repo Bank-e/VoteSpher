@@ -45,15 +45,15 @@ func main() {
 	// 🟢 Public Routes (ไม่ต้องใช้ Token)
 	// ==========================================
 
-	// แก้เป็น r.POST และเอา gin.WrapH ออก เพราะเป็น Gin Handler แล้ว
-	r.POST("/dev/mock-token", auth.MockTokenHandler())
-
 	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
 	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
 	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
 
 	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
 	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
+
+	// ยืนยันรหัส OTP ที่ได้รับมา ถ้าถูกต้องจะคืน JWT token กลับไป
+	r.POST("/voter/otp-confirm", auth.OTPConfirmHandler(db))
 
 	r.GET("/candidates", gin.WrapH(info.GetCandidatesHandler(db)))
 

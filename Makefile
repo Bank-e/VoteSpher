@@ -24,7 +24,8 @@ test-v:
 # รันเทสเฉพาะระบบ Voting ที่เพิ่งทำ Clean Architecture
 test-voting:
 # 	go test -v ./internal/voting
-	go test -v -coverprofile=voting_coverage.out ./internal/voting && go tool cover -html=voting_coverage.out
+# 	go test -v -coverprofile=voting_coverage.out ./internal/voting && go tool cover -html=voting_coverage.out
+	go test -v -coverprofile=election_coverage.out ./internal/election && go tool cover -html=election_coverage.out
 
 # รันเทสและดูเปอร์เซ็นต์ Coverage ใน Terminal
 test-cover:
@@ -39,3 +40,33 @@ test-html:
 # ลบไฟล์ขยะที่เกิดจากการเทส (ทำความสะอาดโปรเจกต์)
 test-clean:
 	-@del /f coverage.out 2>nul || rm -f coverage.out
+
+
+# ==============================================================================
+# Database Docker Commands
+# ==============================================================================
+
+# สั่งรัน Database เป็น Background
+db-up:
+	@echo "🚀 Starting Database..."
+	docker-compose up -d
+	docker ps
+
+# สั่งหยุด Database ชั่วคราว (แต่ยังไม่ลบคอนเทนเนอร์)
+db-stop:
+	@echo "⏸️ Stopping Database..."
+	docker-compose stop
+
+# สั่งหยุดและลบคอนเทนเนอร์ (ข้อมูลใน Database ยังอยู่)
+db-down:
+	@echo "🛑 Stopping and removing Database containers..."
+	docker-compose down
+
+# ⚠️ สั่งล้างบาง! ลบคอนเทนเนอร์และลบข้อมูล (Volume) ทิ้งทั้งหมด (ใช้ตอนอยาก Reset ข้อมูลใหม่)
+db-clean:
+	@echo "🧹 WARNING: Removing Database containers AND clearing all data..."
+	docker-compose down -v
+
+# ดู Log ของ Database (กด Ctrl+C เพื่อออก)
+db-logs:
+	docker-compose logs -f db

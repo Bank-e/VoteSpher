@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0 # ดึง Image MySQL เวอร์ชั่น 8.0 มาใช้งาน
+    container_name: votespher-mysql-local
+    restart: always # ให้เปิดตัวเองขึ้นมาใหม่ถ้าพัง หรือตอนเปิดเครื่อง
+    environment:
+      TZ: Asia/Bangkok # ตั้ง Timezone ให้ตรงกับประเทศไทย
+      MYSQL_ROOT_PASSWORD: yourpassword # ตั้งรหัสผ่าน root ตรงนี้ให้ตรงกับใน .env
+      MYSQL_DATABASE: votespher_db # ให้สร้าง Database ชื่อนี้ให้เลย
+    ports:
+      - "3307:3306" # แมปพอร์ต 3307 ในเครื่องเรา ให้ตรงกับ 3306 ใน Container
+    volumes:
+      - mysql_data:/var/lib/mysql # ทำ Volume เพื่อเซฟข้อมูลลงเครื่องเรา ป้องกันข้อมูลหายเวลาปิด Container
+
+volumes:
+  mysql_data:
