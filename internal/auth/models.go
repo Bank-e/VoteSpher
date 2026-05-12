@@ -34,6 +34,6 @@ type OTPRequestRequest struct {
 }
 
 type OTPRequestResponse struct {
+	OTPCode string `json:"otp_code,omitempty"` // แสดงเฉพาะในโหมด mock
 	RefCode string `json:"ref_code"`
-	OTPCode string `json:"otp_code"` // คืนให้เพื่อใช้ทดสอบ (ในระบบจริงจะส่ง SMS)
 }
