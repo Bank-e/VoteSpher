@@ -77,7 +77,7 @@ func (s *authService) VerifyVoter(req VerifyVoterRequest) (*VerifyVoterResponse,
 }
 
 func (s *authService) RequestOTP(req OTPRequestRequest) (*OTPRequestResponse, error) {
-	_, err := s.repo.FindVoterByID(req.VoterID)
+	voter, err := s.repo.FindVoterByID(req.VoterID)
 	if err != nil {
 		return nil, errors.New("ไม่พบรหัสผู้มีสิทธิ์โหวตนี้")
 	}
@@ -96,9 +96,24 @@ func (s *authService) RequestOTP(req OTPRequestRequest) (*OTPRequestResponse, er
 		return nil, errors.New("สร้าง OTP ไม่สำเร็จ")
 	}
 
+	// จัดการโหมดการส่ง OTP
+	deliveryMode := os.Getenv("OTP_DELIVERY_MODE")
+	if deliveryMode == "mock" {
+		// โหมดทดสอบ ไม่ต้องยิง SMS จริง คืน OTP กลับไปใน Response ให้เลย
+		return &OTPRequestResponse{
+			OTPCode: otpCode,
+			RefCode:    refCode,
+		}, nil
+	}
+
+	// โหมดส่งจริง (thaibulksms)
+	smsBody := fmt.Sprintf("Your VoteSpher OTP is: %s. Ref: %s", otpCode, refCode)
+	if err := pkg.SendSMS(voter.PhoneNumber, smsBody); err != nil {
+		return nil, fmt.Errorf("ระบบไม่สามารถส่ง SMS ได้: %w", err)
+	}
+
 	return &OTPRequestResponse{
 		RefCode: refCode,
-		OTPCode: otpCode,
 	}, nil
 }
 
