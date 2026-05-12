@@ -43,6 +43,7 @@ func main() {
 	electionSvc := election.NewService(electionRepo)
 	electionHandler := election.NewHandler(electionSvc)
 
+
 	infoRepo := info.NewInfoRepository(db)
 	infoService := info.NewInfoService(infoRepo)
 	infoHandler := info.NewInfoHandler(infoService)
@@ -62,6 +63,7 @@ func main() {
 	r.POST("/voter/otp-request", authHandler.OTPRequest)
 	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
 
+
 	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
@@ -78,6 +80,7 @@ func main() {
 		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
 		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
+
 
 	// ==========================================
 	// Admin Routes
