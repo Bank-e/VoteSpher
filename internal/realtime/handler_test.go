@@ -35,7 +35,7 @@ func TestBuildResponseV2(t *testing.T) {
 		{AreaID: 2, AreaName: "B", TotalVotes: 200},
 	}
 
-	resp := BuildResponse(rows)
+	resp := buildResponse(rows)
 
 	if resp.TotalVotes != 300 {
 		t.Errorf("expected total votes 300, got %d", resp.TotalVotes)
@@ -55,10 +55,14 @@ func TestGetAllAreasVotesHandler(t *testing.T) {
 
 	db := setupTestDB()
 
+	repo := NewRealtimeRepository(db)
+	svc := NewRealtimeService(repo)
+	handler := NewRealtimeHandler(svc)
+
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
 
-	r.GET("/votes", GetAllAreasVotesHandler(db))
+	r.GET("/votes", handler.GetAllAreasVotes)
 
 	req, _ := http.NewRequest(http.MethodGet, "/votes", nil)
 	w := httptest.NewRecorder()
@@ -74,9 +78,13 @@ func TestGetAllAreasVotesHandler(t *testing.T) {
 func TestHandlerResponseFormat(t *testing.T) {
 	db := setupTestDB()
 
+	repo := NewRealtimeRepository(db)
+	svc := NewRealtimeService(repo)
+	handler := NewRealtimeHandler(svc)
+
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	r.GET("/votes", GetAllAreasVotesHandler(db))
+	r.GET("/votes", handler.GetAllAreasVotes)
 
 	req, _ := http.NewRequest(http.MethodGet, "/votes", nil)
 	w := httptest.NewRecorder()

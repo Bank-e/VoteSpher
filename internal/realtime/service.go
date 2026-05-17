@@ -2,7 +2,27 @@ package realtime
 
 import "time"
 
-func BuildResponse(rows []AreaVoteRow) Response {
+type RealtimeService interface {
+	GetAllAreasResult() (Response, error)
+}
+
+type realtimeService struct {
+	repo RealtimeRepository
+}
+
+func NewRealtimeService(repo RealtimeRepository) RealtimeService {
+	return &realtimeService{repo: repo}
+}
+
+func (s *realtimeService) GetAllAreasResult() (Response, error) {
+	rows, err := s.repo.GetAllAreasVotes()
+	if err != nil {
+		return Response{}, err
+	}
+	return buildResponse(rows), nil
+}
+
+func buildResponse(rows []AreaVoteRow) Response {
 
 	areas := []AreaResponse{}
 	totalVotes := 0

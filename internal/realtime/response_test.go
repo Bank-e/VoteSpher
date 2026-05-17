@@ -11,7 +11,7 @@ func TestBuildResponse(t *testing.T) {
 		{AreaID: 2, AreaName: "B", TotalVotes: 200},
 	}
 
-	resp := BuildResponse(rows)
+	resp := buildResponse(rows)
 
 	// ✅ check total votes
 	if resp.TotalVotes != 300 {
