@@ -16,13 +16,24 @@ func setupTestDB() *gorm.DB {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 
 	// create tables
-	db.Exec(`CREATE TABLE areas (area_id INTEGER, area_name TEXT);`)
-	db.Exec(`CREATE TABLE votes (vote_id INTEGER, area_id INTEGER);`)
+	db.Exec(`CREATE TABLE areas (area_id INTEGER PRIMARY KEY, area_name TEXT);`)
+	db.Exec(`CREATE TABLE parties (party_id INTEGER PRIMARY KEY, party_no INTEGER, party_name TEXT, logo_url TEXT);`)
+	db.Exec(`CREATE TABLE candidates (candidate_id INTEGER PRIMARY KEY, area_id INTEGER, party_id INTEGER, candidate_no INTEGER, full_name TEXT, biography TEXT);`)
+	db.Exec(`CREATE TABLE votes (vote_id INTEGER PRIMARY KEY, area_id INTEGER, candidate_id INTEGER, party_id INTEGER, created_at DATETIME);`)
 
 	// seed data
-	db.Exec(`INSERT INTO areas (area_id, area_name) VALUES (1, 'A'), (2, 'B');`)
-	db.Exec(`INSERT INTO votes (vote_id, area_id) VALUES 
-	(1,1),(2,1),(3,2);`)
+	db.Exec(`INSERT INTO areas (area_id, area_name) VALUES (1, 'Area A'), (2, 'Area B');`)
+	db.Exec(`INSERT INTO parties (party_id, party_no, party_name) VALUES (1, 1, 'Party X'), (2, 2, 'Party Y');`)
+	db.Exec(`INSERT INTO candidates (candidate_id, area_id, party_id, candidate_no, full_name) VALUES 
+		(1, 1, 1, 1, 'Alice'),
+		(2, 1, 2, 2, 'Bob'),
+		(3, 2, 1, 1, 'Charlie');`)
+	db.Exec(`INSERT INTO votes (vote_id, area_id, candidate_id, party_id) VALUES 
+		(1, 1, 1, 1),
+		(2, 1, 1, 1),
+		(3, 1, 2, 2),
+		(4, 2, 3, 1),
+		(5, 2, 3, 1);`)
 
 	return db
 }
@@ -30,12 +41,20 @@ func setupTestDB() *gorm.DB {
 // ===== Test: BuildResponse =====
 func TestBuildResponseV2(t *testing.T) {
 
-	rows := []AreaVoteRow{
+	areaRows := []AreaVoteRow{
 		{AreaID: 1, AreaName: "A", TotalVotes: 100},
 		{AreaID: 2, AreaName: "B", TotalVotes: 200},
 	}
 
-	resp := buildResponse(rows)
+	candidateRows := []AreaCandidateRow{
+		{AreaID: 1, CandidateNo: 1, CandidateName: "Alice", PartyName: "Party X", Votes: 60},
+	}
+
+	partyRows := []PartyVoteRow{
+		{PartyNo: 1, PartyName: "Party X", Votes: 180},
+	}
+
+	resp := buildResponse(areaRows, candidateRows, partyRows)
 
 	if resp.TotalVotes != 300 {
 		t.Errorf("expected total votes 300, got %d", resp.TotalVotes)
@@ -43,6 +62,10 @@ func TestBuildResponseV2(t *testing.T) {
 
 	if len(resp.Areas) != 2 {
 		t.Errorf("expected 2 areas, got %d", len(resp.Areas))
+	}
+
+	if len(resp.Party) != 1 {
+		t.Errorf("expected 1 party, got %d", len(resp.Party))
 	}
 
 	if resp.LastUpdated == "" {
@@ -102,6 +125,23 @@ func TestHandlerResponseFormat(t *testing.T) {
 
 	if len(resp.Areas) == 0 {
 		t.Error("expected areas but got empty")
+	}
+
+	// ✅ check that candidates are populated
+	hasCandidates := false
+	for _, area := range resp.Areas {
+		if len(area.Candidates) > 0 {
+			hasCandidates = true
+			break
+		}
+	}
+	if !hasCandidates {
+		t.Error("expected at least one area with candidates")
+	}
+
+	// ✅ check that party is populated
+	if len(resp.Party) == 0 {
+		t.Error("expected party results but got empty")
 	}
 
 	if resp.LastUpdated == "" {
