@@ -52,7 +52,7 @@ func (r *resultRepository) GetVoteResultByArea(areaID uint) (AreaResultResponse,
 	var lastUpdated string
 	_ = r.db.
 		Table("votes").
-		Select("MAX(created_at)").
+		Select("COALESCE(MAX(created_at), '') AS last_updated").
 		Where("area_id = ?", areaID).
 		Scan(&lastUpdated).Error
 
