@@ -28,10 +28,11 @@ func (r *resultRepository) GetVoteResultByArea(areaID uint) (AreaResultResponse,
 	var candidateResults []CandidateResult
 	if err := r.db.
 		Table("votes").
-		Select("candidates.candidate_no, candidates.full_name AS name, COUNT(votes.vote_id) AS votes").
+		Select("candidates.candidate_no, candidates.full_name AS name, COALESCE(parties.party_name, 'ไม่สังกัดพรรค') AS party_name, COUNT(votes.vote_id) AS votes").
 		Joins("JOIN candidates ON votes.candidate_id = candidates.candidate_id").
+		Joins("LEFT JOIN parties ON candidates.party_id = parties.party_id").
 		Where("votes.area_id = ?", areaID).
-		Group("candidates.candidate_no, candidates.full_name").
+		Group("candidates.candidate_no, candidates.full_name, parties.party_name").
 		Order("votes DESC").
 		Scan(&candidateResults).Error; err != nil {
 		return AreaResultResponse{}, err

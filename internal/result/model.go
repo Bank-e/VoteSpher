@@ -11,6 +11,7 @@ type AreaResultResponse struct {
 type CandidateResult struct {
 	CandidateNo int    `json:"candidate_no"`
 	Name        string `json:"name"`
+	PartyName   string `json:"party_name"`
 	Votes       int    `json:"votes"`
 }
 
