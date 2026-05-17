@@ -4,38 +4,25 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func GetVoteResultByAreaHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		areaID := c.Param("area_id")
-
-		results, err := GetAreaVotes(db, areaID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, results)
-	}
+type RealtimeHandler struct {
+	service RealtimeService
 }
-func GetAllAreasVotesHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
 
-		rows, err := GetAllAreasVotes(db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
+func NewRealtimeHandler(service RealtimeService) *RealtimeHandler {
+	return &RealtimeHandler{service: service}
+}
 
-		response := BuildResponse(rows)
+func (h *RealtimeHandler) GetAllAreasVotes(c *gin.Context) {
 
-		c.JSON(http.StatusOK, response)
+	result, err := h.service.GetAllAreasResult()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
 	}
+
+	c.JSON(http.StatusOK, result)
 }

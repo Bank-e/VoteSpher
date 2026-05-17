@@ -52,6 +52,10 @@ func main() {
 	resultService := result.NewResultService(resultRepo)
 	resultHandler := result.NewResultHandler(resultService)
 
+	realtimeRepo := realtime.NewRealtimeRepository(db)
+	realtimeSvc := realtime.NewRealtimeService(realtimeRepo)
+	realtimeHandler := realtime.NewRealtimeHandler(realtimeSvc)
+
 	voteRepo := voting.NewVotingRepository(db)
 	voteService := voting.NewVotingService(voteRepo)
 	voteHandler := voting.NewVotingHandler(voteService)
@@ -68,8 +72,8 @@ func main() {
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
 	r.GET("/results/area/:id", resultHandler.GetAreaResult)
-	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
-	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
+	r.GET("/results/areas", realtimeHandler.GetAllAreasVotes)
+
 
 	// ==========================================
 	// Protected Routes (Require Login)
