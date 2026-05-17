@@ -4,8 +4,8 @@ import "time"
 
 // SubmitBallotRequest รับข้อมูลจากผู้โหวต
 type SubmitBallotRequest struct {
-	CandidateNo int `json:"candidate_no" binding:"required"`
-	PartyNo     int `json:"party_no" binding:"required"`
+	CandidateID int `json:"candidate_id"`
+	PartyID     int `json:"party_id"`
 }
 
 type BallotStatusResponse struct {

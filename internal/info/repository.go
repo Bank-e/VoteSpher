@@ -29,6 +29,7 @@ func (r *infoRepository) GetCandidates(areaID int) ([]Candidate, error) {
 	err := r.db.WithContext(context.Background()).
 		Table("candidates").
 		Select(`
+			candidates.candidate_id,
 			candidates.candidate_no,
 			candidates.full_name as name,
 			candidates.party_id,

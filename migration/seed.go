@@ -82,10 +82,10 @@ func SeedData(db *gorm.DB) {
 
     // 2. Parties
     parties := []models.Party{
-        {PartyNo: 1, PartyName: "พรรคประชาชน", LogoURL: "https://media.thairath.co.th/image/JRBsXLw1vXQ5sB7aeUwepRqs1a2hJoWnkygtep1V2yo0tUoPpoe9vA1.jpg"},
-        {PartyNo: 2, PartyName: "พรรคเพื่อไทย", LogoURL: "https://yt3.googleusercontent.com/dtPvavXvlxB6kiY4LB1hUjrvVV6MlJuXV1yOjjBEkAEEM1jdbHanzuTitzS3L0HbUSlhbwaZOA=s900-c-k-c0x00ffffff-no-rj"},
-        {PartyNo: 3, PartyName: "พรรคภูมิใจไทย", LogoURL: "https://www.infoquest.co.th/dxt-content/uploads/2025/06/20250618_-1024x576.png"},
-        {PartyNo: 4, PartyName: "พรรคกล้าธรรม", LogoURL: "https://upload.wikimedia.org/wikipedia/th/thumb/c/cc/KlaThamParty_logo_%282025%29.jpg/250px-KlaThamParty_logo_%282025%29.jpg"},
+        {PartyNo: 1, PartyName: "พรรคประชาชน",  LogoURL: "/images/parties/party1_prachacha.jpg"},
+        {PartyNo: 2, PartyName: "พรรคเพื่อไทย", LogoURL: "/images/parties/party2_phuathai.jpg"},
+        {PartyNo: 3, PartyName: "พรรคภูมิใจไทย", LogoURL: "/images/parties/party3_bhumjaithai.jpg"},
+        {PartyNo: 4, PartyName: "พรรคกล้าธรรม", LogoURL: "/images/parties/party4_klatharm.jpg"},
     }
     if err := db.Create(&parties).Error; err != nil {
         log.Fatalf("❌ Failed to seed parties: %v", err)

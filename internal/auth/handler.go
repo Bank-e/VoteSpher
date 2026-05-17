@@ -181,16 +181,23 @@ func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// สุ่มรหัสจากฟังก์ชันที่เราเพิ่มไว้ใน service.go
-		otpCode, err := generateRandomOTP()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
-			return
+		var otpCode string
+		if os.Getenv("ENABLE_DEV_ENDPOINTS") == "true" {
+			otpCode = "111111"
+		} else {
+			var err2 error
+			otpCode, err2 = generateRandomOTP()
+			if err2 != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
+				return
+			}
 		}
 		refCode, err := generateRefCode()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "สร้าง OTP ไม่สำเร็จ"})
 			return
 		}
+
 
 		// บันทึกลงฐานข้อมูล (ตาราง otps)
 		newOTP := models.OTP{

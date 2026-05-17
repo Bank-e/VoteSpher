@@ -1,0 +1,503 @@
+================================================================================
+                   CODE REVIEW — VoteSpher (โปรเจกต์ระบบเลือกตั้ง)
+                   วันที่รีวิว: 2026-05-05
+================================================================================
+
+โปรเจกต์ : VoteSpher — ระบบเลือกตั้งออนไลน์
+Stack     : Go 1.26 / Gin / GORM / MySQL (Aiven) | React 18 / Vite / Tailwind CSS
+รูปแบบ   : Clean Architecture (Handler → Service → Repository)
+Deploy    : Docker (Alpine) → Railway (Backend) + Vercel (Frontend)
+
+================================================================================
+  1. ภาพรวมโครงสร้างโปรเจกต์
+================================================================================
+
+D:\Vote/
+├── cmd/server/main.go              — Entry point, DI wiring, route registration
+├── config/database.go              — MySQL TLS connection (Aiven)
+├── internal/
+│   ├── auth/                       — VerifyVoter, OTPRequest, OTPConfirm, VoterMe
+│   ├── election/                   — SystemConfig state machine (PREPARE→OPEN→...)
+│   ├── info/                       — Read-only candidates & parties info
+│   ├── middleware/                 — JWT auth, role check, rate limit, audit log
+│   ├── models/                     — GORM domain entities
+│   ├── realtime/                   — Live vote aggregation by area/party
+│   ├── result/                     — Province+area breakdown queries
+│   └── voting/                     — Core ballot submission (transactional)
+├── pkg/
+│   ├── jwt.go                      — HS256 token generation/validation
+│   ├── email.go                    — SMTP HTML email (Gmail)
+│   └── emailqueue.go               — Async worker pool (3 workers, queue=100)
+├── migration/                      — AutoMigrate + seed data
+├── frontend/src/
+│   ├── App.jsx                     — Root; Auth flow + screen routing
+│   ├── pages/VotePage.jsx          — Candidate selection + ballot submission
+│   ├── pages/ResultsPage.jsx       — Real-time dashboard (10s polling)
+│   ├── pages/AdminPage.jsx         — Election lifecycle control panel
+│   └── lib/api.js                  — REST client wrapper (fetch-based)
+├── .env                            — Secrets (DB, JWT, SMTP, CORS)
+├── Dockerfile                      — Multi-stage build (golang:1.23 → alpine)
+└── Makefile                        — run / build / test / coverage
+
+================================================================================
+  2. รีวิวรายโมดูล
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+2.1  cmd/server/main.go  (Entry Point & Routing)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - Dependency Injection ทำ manual ชัดเจน: NewRepo → NewService → NewHandler
+  - แยก Public / Protected / Admin route group ชัดเจน ด้วย middleware stack
+  - มี flag guard สำหรับ dev endpoint (ENABLE_DEV_ENDPOINTS=true)
+  - ใช้ PORT จาก env ได้ทันที (Railway-friendly)
+  - เริ่ม email worker pool ก่อน routing เสมอ
+
+ปัญหา / ข้อสังเกต:
+  [M1] gin.Default() เปิด Logger + Recovery middleware ไว้โดย default
+       ในขั้น production ควรใช้ gin.New() แล้วเลือก middleware เอง
+       เพื่อควบคุม log format และป้องกัน stack trace รั่วไหลสู่ผู้ใช้
+
+  [M2] CORS middleware เขียนเอง (inline function) ทำงานได้ แต่ไม่รองรับ
+       preflight request ที่มี Vary header, credentials, หรือ expose headers
+       ที่ซับซ้อน ควรใช้ github.com/gin-contrib/cors แทน
+
+  [M3] r.Use(middleware.RateLimit()) วางหลัง CORS แต่ก่อน auth ทำให้ IP ถูก
+       rate-limit ก่อนที่จะรู้ว่าเป็น admin → ถูกต้องแล้วในเชิง security
+       แต่ควร document ไว้ให้ชัดเจน
+
+  [M4] auth.VerifyVoterHandler(db), auth.OTPRequestHandler(db) รับ *gorm.DB
+       โดยตรง แทนที่จะรับ service/repository → ผิด pattern กับโมดูลอื่น
+       (voting, election ใช้ DI ถูกต้องแล้ว)
+
+  [M5] r.GET("/results/provinces/:provinces_name/areas/:area_id", ...) ใช้ชื่อ
+       param ว่า :provinces_name (พิมพ์ผิด — น่าจะเป็น :province_name) และ
+       handler นี้ก็รับ *gorm.DB ตรง ๆ เช่นกัน
+
+────────────────────────────────────────────────────────────────────────────────
+2.2  internal/auth/  (Authentication)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - Citizen ID hash ด้วย HMAC-SHA256 + secret key ทำให้ DB ไม่เก็บ PII ดิบ
+  - OTP สุ่มด้วย crypto/rand (ปลอดภัย — ไม่ใช้ math/rand)
+  - Ref code เป็น hex 6 ตัว (สุ่มจาก 3 bytes — entropy ดี)
+  - มี attempt lockout: กรอกผิด 5 ครั้ง → OTP ถูก invalidate ทันที
+  - Mark OTP as used หลังยืนยันสำเร็จ (ป้องกัน replay)
+  - Role ถูกกำหนดฝั่ง server (IsAdmin query) ไม่ให้ client ส่งมาเอง
+  - Async email delivery ผ่าน worker pool → ไม่บล็อก HTTP response
+
+ปัญหา / ข้อสังเกต:
+  [A1] ConfirmOTP ไม่ใช่ Clean Architecture — function-based แทน struct+interface
+       ทำให้ test ต้องใช้ real DB หรือ integration test เท่านั้น
+       ส่วน voting/election ใช้ interface ได้ถูกต้อง → ควร refactor auth ให้ match
+
+  [A2] ฟังก์ชัน ConfirmOTP ใน service.go รับ *gorm.DB โดยตรง
+       → ทำให้ business logic ผูกติดกับ database layer โดยตรง
+       ควรแยกเป็น repository pattern เหมือนโมดูลอื่น
+
+  [A3] กรณีที่ OTP ถูกยกเลิก (attempts >= 5) แล้วผู้ใช้ขอ OTP ใหม่
+       ระบบจะสร้าง OTP record ใหม่ในตาราง แต่ OTP เก่ายังอยู่ใน DB (is_used=true)
+       ควร clean up หรือ soft-delete OTP เก่าเพื่อป้องกัน table bloat
+
+  [A4] FindOTPByRefCode ต้องใช้ ref_code เดิมที่ได้จาก otp-request
+       แต่ frontend เก็บ ref_code ใน React state (memory เท่านั้น)
+       ถ้า user refresh browser → ต้องขอ OTP ใหม่ทั้งหมด
+       อาจ UX ไม่ดีสำหรับผู้ใช้ทั่วไป ควร persist ref_code ใน sessionStorage
+
+  [A5] ไม่มี rate limit เฉพาะสำหรับ /voter/otp-request
+       global rate limit (60/min/IP) อาจไม่เพียงพอป้องกัน OTP spam
+       ควรเพิ่ม per-voter rate limit บน endpoint นี้โดยเฉพาะ
+
+────────────────────────────────────────────────────────────────────────────────
+2.3  internal/voting/  (Core Ballot Submission)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - ExecuteVoteTransaction ใช้ GORM .Transaction() + SELECT FOR UPDATE
+    → ป้องกัน race condition และ duplicate vote ได้ระดับ DB
+  - Secret ballot: Vote record ไม่มี voter_id → unlink ได้ถูกต้อง
+  - Double-check IsVoted ภายใน transaction หลัง row lock
+    (ไม่ใช่แค่ pre-check ข้างนอก)
+  - Clean Architecture สมบูรณ์: Interface → Struct → Constructor
+  - CheckUserHasVoted ใช้ SELECT ที่ field เดียว (is_voted) — efficient
+
+ปัญหา / ข้อสังเกต:
+  [V1] ExecuteVoteTransaction บันทึก Vote ก่อน อัปเดต voter.IsVoted ทีหลัง
+       ถ้า Update voter ล้มเหลว transaction จะ rollback แต่ Vote ก็ถูก rollback ด้วย
+       → ถูกต้องแล้ว แต่ order ควรสลับเป็น: lock voter → check IsVoted →
+         update IsVoted ก่อน → create Vote ทีหลัง
+         เพื่อให้ DB constraint ทำงานก่อน insert vote
+
+  [V2] time.Now() ใช้เวลา server (Go) ไม่ใช่ DB timestamp
+       ในระบบที่ deploy หลาย instance อาจมี clock skew เล็กน้อย
+       ควรใช้ gorm.Model ที่มี CreatedAt หรือใช้ DB function NOW()
+
+  [V3] GetActiveConfig อยู่ใน VotingRepository แต่ business logic ที่ตรวจสอบ
+       window time อยู่ใน service → ถูกต้อง แต่ logic ที่ตรวจ "OPEN" status
+       ควรเป็น enum/constant ไม่ใช่ magic string
+
+  [V4] SubmitBallot ตรวจ election window ใน service layer ก่อน execute transaction
+       แต่ไม่มี re-check ใน transaction เอง → มีช่องว่าง TOCTOU เล็กน้อย
+       (election อาจ pause ระหว่าง check กับ vote)
+       ในระบบจริงควร validate status ใน transaction ด้วย
+
+────────────────────────────────────────────────────────────────────────────────
+2.4  internal/election/  (Election State Machine)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - State machine ชัดเจน: PREPARE → OPEN → PAUSED → CLOSED → COUNTING
+  - CLOSED ไม่สามารถกลับไป OPEN ได้ — บังคับ programmatically
+  - Versioning: config เก่า deactivate → สร้าง config ใหม่ (history preserved)
+  - Normalization: รับ status case-insensitive แต่บันทึก uppercase
+  - Time validation: start < end ตรวจก่อน persist
+
+ปัญหา / ข้อสังเกต:
+  [E1] State transition rules อยู่ใน map[string][]string ใน service
+       แต่ไม่มี comment อธิบาย business reason ว่าทำไม CLOSED → OPEN ถึงห้าม
+       ควรมีอย่างน้อย 1 บรรทัด explain ใน code
+
+  [E2] การ deactivate config เก่าและ create ใหม่ไม่ได้อยู่ใน DB transaction เดียวกัน
+       → ถ้า create ใหม่ล้มเหลว จะมีสถานะที่ไม่มี active config อยู่ในระบบ
+       ควร wrap ทั้ง 2 operation ใน transaction เดียว
+
+  [E3] AdminID ใน SystemConfig คือใคร? ถ้า admin หลายคน record นี้จะเก็บแค่
+       คนสุดท้ายที่แก้ไข → ควร rename เป็น UpdatedByAdminID เพื่อความชัดเจน
+
+────────────────────────────────────────────────────────────────────────────────
+2.5  internal/middleware/  (JWT / RateLimit / Audit)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - RequireAuth() ตรวจ Bearer token, validate signature และ expiry ครบ
+  - RequireRole() แยก concern ออกจาก RequireAuth() cleanly
+  - AuditLog() ทำงาน async (goroutine) ไม่บล็อก response
+  - RateLimit ใช้ sliding window approach (กรอง timestamp เก่า ออก)
+  - Rate limiter ป้องกัน map read/write race ด้วย sync.Mutex
+
+ปัญหา / ข้อสังเกต:
+  [MW1] RateLimit เก็บ state ใน in-memory map → ไม่รองรับ horizontal scaling
+        ถ้า deploy หลาย instance ผู้ใช้แต่ละคนจะถูกนับแยก per-instance
+        ควรใช้ Redis-backed rate limiter ถ้า scale ออก
+
+  [MW2] rate_limit.go ไม่มี cleanup goroutine สำหรับ IP ที่ inactive
+        map จะโตเรื่อย ๆ ตลอด uptime ของ server
+        ควรมี background goroutine ที่ sweep expired entries เป็นระยะ
+
+  [MW3] AuditLog goroutine ไม่มี error handling ถ้า DB insert ล้มเหลว
+        จะ silent fail — ในระบบ election อาจต้องการ guarantee ที่แน่นกว่านี้
+        อย่างน้อยควร log.Printf ถ้า audit insert error
+
+  [MW4] c.ClientIP() ใน Gin จะ trust X-Forwarded-For header ถ้า set TrustedProxies
+        ควรตั้งค่า r.SetTrustedProxies() ให้ถูกต้องเพื่อป้องกัน IP spoofing
+        ผ่าน X-Forwarded-For header
+
+────────────────────────────────────────────────────────────────────────────────
+2.6  pkg/jwt.go  (Token Management)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - ใช้ golang-jwt/jwt v5 (library ที่ maintain อยู่)
+  - Claims มี voter_id, area_id, role — ครบสำหรับ authorization
+  - ตรวจ Algorithm ป้องกัน algorithm confusion attack (alg:none / RS256 bypass)
+  - JWT_EXPIRY_HOURS configurable ผ่าน env
+
+ปัญหา / ข้อสังเกต:
+  [J1] ใช้ HS256 (symmetric) — secret เดียวกันทั้ง sign และ verify
+       ถ้า secret รั่ว token ทั้งหมดถูก forge ได้
+       สำหรับระบบ election ควรพิจารณา RS256 (asymmetric)
+       ที่ private key อยู่เฉพาะ signing server
+
+  [J2] ไม่มี token revocation / blacklist mechanism
+       ถ้า token หลุด จะใช้งานได้จนหมดอายุ (สูงสุด JWT_EXPIRY_HOURS ชั่วโมง)
+       ควร implement token version หรือ jti blacklist ใน Redis
+
+  [J3] JWT secret ดึงจาก os.Getenv() ทุกครั้งที่ validate
+       ควร cache ไว้ใน struct เพื่อ performance และ fail-fast ตอน startup
+
+────────────────────────────────────────────────────────────────────────────────
+2.7  frontend/src/lib/api.js  (API Client)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - wrapper function req() กระชับ ใช้ซ้ำได้ ไม่ duplicate code
+  - Error throwing สม่ำเสมอ: throw Error เสมอถ้า !res.ok
+  - encodeURIComponent() บน province name ป้องกัน URL injection
+  - BASE URL จาก env var → deploy-agnostic
+
+ปัญหา / ข้อสังเกต:
+  [F1] JWT token ถูกส่งเป็น parameter ตรง ๆ ในแต่ละ function call
+       เช่น api.submit(body, token), api.setConfig(body, token)
+       → token น่าจะเก็บใน module-level variable หรือ React context
+         เพื่อไม่ต้องส่ง token ซ้ำทุก call
+
+  [F2] Token เก็บใน React state (App.jsx) ซึ่งอยู่ใน JavaScript memory
+       → ถ้าทำ XSS ได้ token จะถูกขโมยได้
+       ควรเก็บใน httpOnly cookie แทน (ต้องปรับ backend ด้วย)
+       แต่ถ้าใช้ React state ก็ต้อง strict เรื่อง CSP และ input sanitization
+
+  [F3] fetch ไม่ได้ส่ง credentials: 'include' → ถ้าเปลี่ยนมาใช้ cookie-based
+       auth ในอนาคตต้องปรับ api.js ด้วย
+
+  [F4] ไม่มี request timeout — ถ้า backend ช้า / ไม่ตอบ request จะค้างไม่มีกำหนด
+       ควรใช้ AbortController + setTimeout เพื่อ fail fast
+
+────────────────────────────────────────────────────────────────────────────────
+2.8  frontend/src/  (React Components)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - Component แยกหน้าที่ชัดเจน: VotePage / ResultsPage / AdminPage
+  - Confirmation modal ก่อน submit vote → ลด human error
+  - Auto-refresh results ทุก 10 วินาที (countdown แสดงให้เห็น)
+  - OTP input รองรับ paste clipboard → UX ดี
+  - Countdown timer แสดงเวลาปิดรับโหวต
+
+ปัญหา / ข้อสังเกต:
+  [FE1] ResultsPage.jsx ใช้ setInterval สำหรับ 10-second refresh
+        ควรใช้ useEffect cleanup เพื่อ clear interval ตอน component unmount
+        มิฉะนั้นจะเกิด memory leak และ stale closure
+
+  [FE2] AdminPage มี state ที่ซับซ้อน (config, stats, topAreas, form ฯลฯ)
+        ควร extract custom hook (useAdminPage) หรือ useReducer
+        เพื่อแยก data fetching logic ออกจาก render logic
+
+  [FE3] Error messages ที่ได้จาก backend (ภาษาไทย) แสดงตรง ๆ ให้ผู้ใช้เห็น
+        ดี แต่ควร ensure ว่า server ไม่เคย leak stack trace / SQL error message
+        ไปยัง response body ที่ frontend จะแสดง
+
+  [FE4] ไม่มี loading skeleton / placeholder ขณะรอ API response
+        ทำให้หน้าจอดู "กระโดด" เวลาข้อมูลโหลด (UX ไม่เนียน)
+
+  [FE5] VotePage ไม่มี guard ป้องกันการ submit ซ้ำขณะ request กำลังส่งอยู่
+        (double-click submit) ควร disable submit button ขณะ loading
+
+────────────────────────────────────────────────────────────────────────────────
+2.9  pkg/email.go + emailqueue.go  (Email System)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - Worker pool 3 workers + queue 100 jobs → async, non-blocking
+  - Fallback sync send ถ้า queue เต็ม (ไม่ drop email ทันที)
+  - HTML template ดูดี มี OTP font ใหญ่, ref code monospace
+
+ปัญหา / ข้อสังเกต:
+  [EM1] ถ้า SMTP fail (network error / Gmail quota) ไม่มี retry mechanism
+        → OTP email หายและผู้ใช้ขอ OTP ใหม่ไม่ได้จนกว่า OTP เก่าหมดอายุ (5 นาที)
+        ควรมี retry (exponential backoff) อย่างน้อย 3 ครั้ง
+
+  [EM2] SMTP_PASSWORD เก็บใน .env และอ่านผ่าน os.Getenv
+        ควรใช้ secrets manager (Railway secrets / Vault) แทน
+
+  [EM3] email.go ไม่มี timeout บน smtp.Dial หรือ SendMail
+        ถ้า SMTP server ช้า worker goroutine จะค้างและ drain pool
+
+────────────────────────────────────────────────────────────────────────────────
+2.10  config/database.go  (DB Connection)
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - รองรับ TLS certificate ผ่าน file path หรือ env var (base64/PEM)
+  - ใช้ tls.Config พร้อม root CA
+  - SetMaxOpenConns / SetMaxIdleConns / ConnMaxLifetime ตั้งค่าแล้ว
+
+ปัญหา / ข้อสังเกต:
+  [DB1] ค่า pool: MaxOpenConns=25, MaxIdleConns=10, ConnMaxLifetime=5min
+        สำหรับ Aiven free tier ที่จำกัด connection อาจ over-provision
+        ควร tune ให้ตรงกับ max_connections ของ DB instance จริง
+
+  [DB2] ถ้า ConnectDB() fail ระบบจะ log.Fatal ทันที → ดี แต่ error message
+        ควร sanitize (ไม่ include DSN string ที่มี password) ก่อน log
+
+────────────────────────────────────────────────────────────────────────────────
+2.11  Testing
+────────────────────────────────────────────────────────────────────────────────
+
+ดี:
+  - มี test ครอบคลุมใน voting, election, auth, middleware, jwt, realtime
+  - ใช้ table-driven tests → readable และ maintainable
+  - ใช้ DATA-DOG/go-sqlmock → isolate DB dependency ได้
+  - Interface-based mocking → testable design
+
+ปัญหา / ข้อสังเกต:
+  [T1] auth module ไม่มี unit test ที่ครบ เพราะ ConfirmOTP รับ *gorm.DB โดยตรง
+       ทำให้ต้องทำ integration test เท่านั้น
+       → เป็นผลพวงจาก [A1] ที่ auth ไม่ใช้ repository pattern
+
+  [T2] Frontend ไม่มี test เลย (ไม่มี .test.jsx หรือ vitest config)
+       ควรมีอย่างน้อย unit test สำหรับ api.js และ component render test
+
+  [T3] ไม่มี end-to-end test (เช่น Playwright/Cypress) สำหรับ full auth flow
+       ซึ่งสำคัญมากในระบบ election
+
+  [T4] Coverage report อ้างอิงได้แค่ voting module (make test-voting)
+       ควรมี coverage report รวมทุก package
+
+================================================================================
+  3. สรุปจุดแข็ง (Strengths)
+================================================================================
+
+  S1  [Security] Secret ballot ที่แท้จริง
+      Vote record ไม่มี voter_id เลย — เชื่อม voter กับ vote ไม่ได้
+      แม้แต่ DBA ก็ไม่สามารถรู้ว่าใครโหวตใคร
+
+  S2  [Security] Double-protection ป้องกัน duplicate vote
+      CheckUserHasVoted ก่อน + SELECT FOR UPDATE ใน transaction
+      → ป้องกันได้ทั้ง logic level และ race condition level
+
+  S3  [Security] Citizen ID ไม่เก็บดิบ
+      ใช้ HMAC-SHA256 + secret key ทำให้แม้ DB หลุด citizen ID ยังปลอดภัย
+      (ต่างจาก MD5/SHA1 ที่ brute-force ได้)
+
+  S4  [Security] Cryptographically secure randomness
+      OTP และ Ref code สุ่มด้วย crypto/rand ไม่ใช่ math/rand
+
+  S5  [Architecture] Clean Architecture สมบูรณ์ (voting, election, info)
+      Handler / Service / Repository แยกหน้าที่ชัดเจน
+      ทำให้ test และ extend ได้ง่าย
+
+  S6  [Architecture] State machine election lifecycle
+      ป้องกัน invalid transition programmatically (CLOSED ไม่กลับไป OPEN)
+      และ preserve history ของ config ทุก version
+
+  S7  [Performance] Async email delivery
+      Worker pool ไม่บล็อก HTTP response เลย
+      ผู้ใช้ได้รับ response ก่อน แล้ว email ส่งใน background
+
+  S8  [Reliability] Database transaction + row-level locking
+      ExecuteVoteTransaction เป็น atomic operation
+      ทนทานต่อ concurrent requests จากผู้ใช้คนเดียวกัน
+
+  S9  [Observability] Audit logging สำหรับทุก vote submission
+      บันทึก voter_id, IP, timestamp, action → traceable
+
+  S10 [DX] Makefile + Docker + Railway deploy config ครบ
+      ทีมใหม่ onboard ได้เร็ว ไม่ต้อง configure เยอะ
+
+  S11 [UX] Two-factor auth (Citizen ID + OTP email)
+      เหมาะสมสำหรับระบบ election ที่ต้องการ identity verification
+
+  S12 [UX] Real-time results dashboard ด้วย 10-second polling
+      ไม่ต้อง implement WebSocket แต่ก็ให้ผลใกล้ real-time
+
+================================================================================
+  4. สรุปจุดอ่อน (Weaknesses)
+================================================================================
+
+  ── ความปลอดภัย ──────────────────────────────────────────────────────────────
+
+  W1  [HIGH] JWT token เก็บใน JavaScript memory (React state)
+      ถ้าเกิด XSS attack token จะถูกขโมยได้
+      แนะนำ: ใช้ httpOnly cookie แทน หรืออย่างน้อยมี Content-Security-Policy header
+
+  W2  [HIGH] ไม่มี token revocation mechanism
+      JWT ที่หลุดออกไปสามารถใช้งานได้จนหมดอายุ (สูงสุด JWT_EXPIRY_HOURS)
+      แนะนำ: Redis-backed jti blacklist หรือ token version ใน DB
+
+  W3  [MEDIUM] Rate limit เฉพาะ global (60/min/IP) ไม่มี per-endpoint limit
+      OTP spam ยังเป็นไปได้ภายใน 60 req/min
+      แนะนำ: จำกัด /voter/otp-request ให้ขอได้ 3-5 ครั้ง/นาที/voter
+
+  W4  [MEDIUM] CORS middleware เขียนเอง — ไม่ handle CORS corner cases
+      แนะนำ: ใช้ gin-contrib/cors ที่ tested แล้ว
+
+  W5  [MEDIUM] HS256 JWT — symmetric key เดียวกัน sign+verify
+      แนะนำ: พิจารณา RS256 สำหรับ production election system
+
+  W6  [LOW] TOCTOU ใน ballot submission
+      status check ก่อน transaction แต่ไม่ re-check ใน transaction
+      แนะนำ: query SystemConfig.Status ใน transaction เดียวกับ vote
+
+  ── สถาปัตยกรรม ───────────────────────────────────────────────────────────────
+
+  W7  [MEDIUM] Auth module ไม่สอดคล้องกับ Clean Architecture ของโมดูลอื่น
+      ConfirmOTP รับ *gorm.DB โดยตรง ทำให้ unit test ยาก
+      แนะนำ: refactor เป็น AuthRepository + AuthService interface
+
+  W8  [MEDIUM] หลาย handler ยัง inject *gorm.DB โดยตรง (auth, result, realtime)
+      แนะนำ: migrate ทุก handler ให้ใช้ DI pattern เหมือน voting/election
+
+  W9  [LOW] Election config deactivate + create ใหม่ไม่อยู่ใน transaction เดียว
+      แนะนำ: wrap ทั้งสอง operation ใน db.Transaction()
+
+  ── Scalability ───────────────────────────────────────────────────────────────
+
+  W10 [MEDIUM] Rate limiter อยู่ใน in-memory
+      ไม่รองรับ horizontal scaling และ map ไม่มี cleanup routine
+      แนะนำ: Redis-backed rate limiter + sweep goroutine
+
+  W11 [LOW] Results endpoint ไม่มี caching
+      /results/areas ถูก query ทุก 10 วินาทีจากทุก client
+      แนะนำ: cache response 5-10 วินาที (in-memory หรือ Redis)
+
+  ── Testing & Quality ─────────────────────────────────────────────────────────
+
+  W12 [HIGH] Frontend ไม่มี test เลย
+      Components หลัก (VotePage, ResultsPage, AdminPage) ไม่มี unit test
+      แนะนำ: เพิ่ม Vitest + React Testing Library
+
+  W13 [MEDIUM] ไม่มี E2E test สำหรับ full voting flow
+      แนะนำ: Playwright หรือ Cypress สำหรับ auth → vote → result journey
+
+  W14 [LOW] Coverage report ครอบคลุมแค่บาง package
+      แนะนำ: go test -coverprofile=coverage.out ./... ทุก package
+
+  ── Infrastructure ────────────────────────────────────────────────────────────
+
+  W15 [MEDIUM] .env file อาจมีใน repository (DB password, JWT secret, SMTP pass)
+      แนะนำ: ตรวจสอบ .gitignore ว่า .env ถูก exclude แน่นอน
+              และใช้ Railway secrets / environment variables แทน
+
+  W16 [LOW] Email ไม่มี retry mechanism
+      ถ้า SMTP fail ครั้งแรก → OTP หาย ผู้ใช้ต้องรอ 5 นาทีแล้วขอใหม่
+      แนะนำ: retry 3 ครั้งด้วย exponential backoff
+
+  W17 [LOW] SMTP connection ไม่มี timeout
+      ถ้า Gmail ช้า worker goroutine ค้าง ลด effective worker count
+      แนะนำ: context.WithTimeout บน smtp operation
+
+================================================================================
+  5. Priority ของการแก้ไข
+================================================================================
+
+  CRITICAL (ควรแก้ก่อน production):
+    - W1   : Token storage → httpOnly cookie + CSP header
+    - W2   : Token revocation mechanism
+    - W15  : Confirm .env ไม่อยู่ใน git repository
+
+  HIGH (ควรแก้ใน sprint ถัดไป):
+    - W7   : Refactor auth → Clean Architecture
+    - W12  : เพิ่ม frontend unit tests
+    - W3   : Per-endpoint rate limit บน otp-request
+    - W4   : ใช้ gin-contrib/cors
+
+  MEDIUM (ค่อย ๆ ปรับปรุง):
+    - W6   : Re-check election status ใน vote transaction
+    - W9   : Wrap election config update ใน single transaction
+    - W10  : Redis-backed rate limiter
+    - W11  : Response caching สำหรับ results endpoints
+    - W13  : เพิ่ม E2E tests
+    - W16  : Email retry mechanism
+    - W17  : SMTP timeout
+
+  LOW (technical debt ระยะยาว):
+    - W5   : RS256 JWT
+    - W8   : Migrate all handlers to DI
+    - W14  : Full coverage report
+
+================================================================================
+  6. ข้อแนะนำสั้น ๆ เพิ่มเติม
+================================================================================
+
+  1. เพิ่ม /health endpoint สำหรับ Railway health check และ monitoring
+  2. ตั้งค่า r.SetTrustedProxies([]string{"<Railway IP range>"}) ให้ถูกต้อง
+  3. เพิ่ม Vary: Origin header ใน CORS response เพื่อ proxy cache ที่ถูกต้อง
+  4. พิจารณา pagination บน /candidates และ /parties สำหรับข้อมูลจำนวนมาก
+  5. เพิ่ม request ID ใน response header และ audit log สำหรับ traceability
+  6. ใช้ gin.New() + custom Logger แทน gin.Default() ใน production
+
+================================================================================
+  END OF REVIEW
+================================================================================

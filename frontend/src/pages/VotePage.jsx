@@ -20,31 +20,45 @@ function useTimer(endTime) {
 // ─── Candidate card ───────────────────────────────────────────────────────────
 function CandidateCard({ c, selected, onSelect }) {
   const [open, setOpen] = useState(false)
-  const isSelected = selected?.candidate_no === c.candidate_no
+  const isSelected = selected?.candidate_id === c.candidate_id
   return (
     <div className={`rounded-2xl border-2 transition-all duration-200 overflow-hidden
-      ${isSelected ? 'border-primary-600 shadow-lg shadow-primary-100' : 'border-gray-100 hover:border-primary-200'}`}>
+      ${isSelected
+        ? 'border-blue-600 ring-2 ring-blue-300 shadow-lg'
+        : 'border-gray-200 hover:border-blue-200'}`}>
       <button onClick={() => onSelect(c)}
         className={`w-full flex items-center gap-4 p-4 text-left transition-colors
-          ${isSelected ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'}`}>
-        {/* Logo */}
-        <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100 bg-gray-50">
+          ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}>
+        {/* Logo with selected overlay */}
+        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100 bg-gray-50">
           {c.logo_url
             ? <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1"/>
             : <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-300">{c.candidate_no}</div>
           }
+          {isSelected && (
+            <div className="absolute inset-0 bg-blue-600/20 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+            </div>
+          )}
         </div>
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-xs font-bold px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">#{c.candidate_no}</span>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+              #{c.candidate_no}
+            </span>
             <span className="text-xs text-gray-400 truncate">{c.party_name}</span>
           </div>
-          <p className="font-bold text-gray-900 text-sm leading-snug">{c.name}</p>
+          <p className={`font-bold text-sm leading-snug ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>{c.name}</p>
+          {isSelected && <p className="text-xs text-blue-600 font-semibold mt-0.5">✓ เลือกแล้ว</p>}
         </div>
         {/* Radio */}
         <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all
-          ${isSelected ? 'border-primary-600 bg-primary-600' : 'border-gray-300'}`}>
+          ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300'}`}>
           {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white"/>}
         </div>
       </button>
@@ -126,7 +140,7 @@ export default function VotePage({ token, voterInfo, onVoted, onLogout }) {
   const handleSubmit = async () => {
     setSubmitting(true); setError('')
     try {
-      await api.submit({ candidate_no: selected.candidate_no, party_no: selected.party_id }, token)
+      await api.submit({ candidate_id: selected.candidate_id, party_id: selected.party_id }, token)
       onVoted()
     } catch (e) { setError(e.message); setConfirming(false) }
     finally { setSubmitting(false) }
