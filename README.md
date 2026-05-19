@@ -188,27 +188,48 @@ vote/
 
 ---
 
-## Deploy Online
+## Deploy Online (Railway + Aiven)
 
-### Backend → Railway
+Backend serve frontend ในตัว — ใช้แค่ **2 services** เท่านั้น
 
-1. เข้า [railway.app](https://railway.app) → New Project → Deploy from GitHub
-2. เลือก repo นี้
-3. ตั้ง Environment Variables ตาม `.env.example`
-4. Railway ใช้ `Dockerfile` + `railway.toml` อัตโนมัติ
+### ขั้นตอน
 
-### Frontend → Vercel
+**1. Database → Aiven**
+1. สมัคร [aiven.io](https://aiven.io) → New Service → MySQL → Free plan
+2. รอ provision → copy Host, Port, User, Password, Database
+3. ถ้าใช้ TLS: download `ca.pem`
 
-1. เข้า [vercel.com](https://vercel.com) → New Project → Import repo นี้
-2. Set **Root Directory** = `frontend`
-3. ตั้ง Environment Variable: `VITE_API_URL` = URL ของ Railway backend
-4. Deploy
+**2. Deploy → Railway**
+1. สมัคร [railway.app](https://railway.app) → New Project → Deploy from GitHub repo นี้
+2. Railway detect `Dockerfile` อัตโนมัติ (build frontend + backend รวมกัน)
+3. ตั้ง **Environment Variables**:
 
-### Database → Aiven (MySQL Cloud)
+```
+DB_HOST=<aiven host>
+DB_PORT=<aiven port>
+DB_USER=<aiven user>
+DB_PASSWORD=<aiven password>
+DB_NAME=defaultdb
+JWT_SECRET_KEY=<random 32+ chars>
+HASH_SECRET_KEY=<random 32+ chars>
+JWT_EXPIRY_HOURS=2
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=<gmail>
+SMTP_PASSWORD=<gmail app password>
+SMTP_FROM=<gmail>
+CORS_ALLOWED_ORIGIN=*
+ENABLE_DEV_ENDPOINTS=false
+```
 
-1. สร้าง MySQL service ที่ [aiven.io](https://aiven.io)
-2. ใส่ connection string ใน Railway environment variables
-3. ถ้าใช้ TLS ให้ download `ca.pem` แล้วตั้ง `DB_CA_CERT` path
+4. หลัง deploy สำเร็จ — run migration **ครั้งเดียว**:
+   ตั้ง `RUN_MIGRATION=true` → Redeploy → รอเสร็จ → เอาออก → Redeploy อีกครั้ง
+
+5. (Optional) Seed ข้อมูลตัวอย่าง: ทำแบบเดียวกับ `RUN_SEED=true`
+
+6. เปิด URL ที่ Railway ให้มา — ใช้งานได้เลย ✅
+
+> หากใช้ Aiven TLS: ตั้ง `DB_CA_CERT` path หรือ disable SSL ใน Aiven สำหรับ demo
 
 ---
 

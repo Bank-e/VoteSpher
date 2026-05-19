@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
@@ -127,6 +128,24 @@ func main() {
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
 	{
 		admin.PATCH("/election/config", electionHandler.UpdateConfig)
+	}
+
+	// Serve frontend static files (single-service deployment)
+	if _, err := os.Stat("./frontend/dist"); err == nil {
+		r.Static("/assets", "./frontend/dist/assets")
+		r.StaticFile("/favicon.ico", "./frontend/dist/favicon.ico")
+		r.NoRoute(func(c *gin.Context) {
+			// API paths return 404 JSON; everything else serves SPA
+			p := c.Request.URL.Path
+			apiPrefixes := []string{"/voter", "/ballot", "/election", "/results", "/candidates", "/parties", "/dev"}
+			for _, prefix := range apiPrefixes {
+				if strings.HasPrefix(p, prefix) {
+					c.JSON(404, gin.H{"error": "not found"})
+					return
+				}
+			}
+			c.File("./frontend/dist/index.html")
+		})
 	}
 
 	port := os.Getenv("PORT")
