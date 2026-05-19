@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var SMTPSendMail func(addr string, a smtp.Auth, from string, to []string, msg []byte) error = smtp.SendMail
+
 // SendOTPEmail ส่ง OTP ไปยัง email ของผู้ใช้ผ่าน SMTP
 // ถ้าไม่ได้ตั้ง SMTP_HOST จะ skip (dev mode)
 func SendOTPEmail(toEmail, otpCode, refCode string) error {
@@ -45,7 +47,7 @@ func SendOTPEmail(toEmail, otpCode, refCode string) error {
 	)
 
 	addr := fmt.Sprintf("%s:%s", host, port)
-	if err := smtp.SendMail(addr, auth, from, []string{toEmail}, []byte(msg)); err != nil {
+	if err := SMTPSendMail(addr, auth, from, []string{toEmail}, []byte(msg)); err != nil {
 		return fmt.Errorf("ส่ง email ไม่สำเร็จ: %w", err)
 	}
 

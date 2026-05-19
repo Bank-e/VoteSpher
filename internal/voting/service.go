@@ -2,6 +2,7 @@ package voting
 
 import (
 	"errors"
+	"strings"
 	"time"
 	"votespher/internal/models"
 
@@ -40,6 +41,16 @@ func NewVotingService(repo VotingRepository) VotingService {
 
 // SubmitVote จัดการขั้นตอนและกฎเกณฑ์ก่อนการลงคะแนน
 func (s *votingService) SubmitVote(voterID uint, areaID uint, req SubmitBallotRequest) error {
+
+	// 1. ดึงการตั้งค่าระบบและตรวจสอบสถานะก่อนรับโหวต
+	config, err := s.repo.GetActiveConfig()
+	if err != nil {
+		return NewAppError(500, "ไม่พบการตั้งค่าระบบเลือกตั้งที่ใช้งานอยู่")
+	}
+	now := time.Now()
+	if strings.ToLower(config.Status) != "open" || now.Before(config.StartTime) || now.After(config.EndTime) {
+		return NewAppError(403, "อยู่นอกเวลาการลงคะแนน หรือระบบปิดรับคะแนนแล้ว")
+	}
 
 	// 3. เตรียมข้อมูลผลโหวต (ประกอบร่าง Data)
 	var candidateID *uint

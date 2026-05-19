@@ -5,7 +5,6 @@ import (
 	"os"
 	"votespher/config"
 	"votespher/internal/auth"
-	"votespher/pkg"
 	"votespher/internal/election"
 	"votespher/internal/info"
 	"votespher/internal/middleware"
@@ -13,31 +12,30 @@ import (
 	"votespher/internal/result"
 	"votespher/internal/voting"
 	"votespher/migration"
+	"votespher/pkg"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// 1. โหลด Environment Variables และเชื่อมต่อ Database
 	config.LoadEnv()
 	db := config.ConnectDB()
 
-	// เริ่ม async email worker pool (3 workers)
 	pkg.StartEmailWorker(3)
 
-	// 2. ตรวจ flag ก่อน run migration
 	if os.Getenv("RUN_MIGRATION") == "true" {
 		migration.Run(db)
 		return
 	}
-
-	// 3. รัน Data Seeding (ใส่ข้อมูลจำลอง 20 รายการ)
 	if os.Getenv("RUN_SEED") == "true" {
 		migration.SeedData(db)
 		return
 	}
+	if os.Getenv("RUN_ADD_TEST_ACCOUNTS") == "true" {
+		migration.SeedTestAccounts(db)
+		return
+	}
 
-	// 4. สร้าง HTTP Router ด้วย Gin
 	r := gin.Default()
 
 	// CORS middleware
@@ -56,57 +54,61 @@ func main() {
 		c.Next()
 	})
 
-	// Rate limiting: 60 requests per minute per IP
 	r.Use(middleware.RateLimit())
 
+	// ==========================================
 	// Dependency Injection
-	voteRepo := voting.NewVotingRepository(db)
-	voteService := voting.NewVotingService(voteRepo)
-	voteHandler := voting.NewVotingHandler(voteService)
+	// ==========================================
+	authRepo := auth.NewAuthRepository(db)
+	authService := auth.NewAuthService(authRepo)
+	authHandler := auth.NewAuthHandler(authService, db)
 
 	electionRepo := election.NewRepository(db)
 	electionSvc := election.NewService(electionRepo)
 	electionHandler := election.NewHandler(electionSvc)
 
-	// ==========================================
-	// 🟢 Public Routes (ไม่ต้องใช้ Token)
-	// ==========================================
+	infoRepo := info.NewInfoRepository(db)
+	infoService := info.NewInfoService(infoRepo)
+	infoHandler := info.NewInfoHandler(infoService)
 
-	// เปิดใช้งานเฉพาะเมื่อตั้ง ENABLE_DEV_ENDPOINTS=true เท่านั้น
+	resultRepo := result.NewResultRepository(db)
+	resultSvc := result.NewResultService(resultRepo)
+	resultHandler := result.NewResultHandler(resultSvc)
+
+	realtimeRepo := realtime.NewRealtimeRepository(db)
+	realtimeSvc := realtime.NewRealtimeService(realtimeRepo)
+	realtimeHandler := realtime.NewRealtimeHandler(realtimeSvc)
+
+	voteRepo := voting.NewVotingRepository(db)
+	voteService := voting.NewVotingService(voteRepo)
+	voteHandler := voting.NewVotingHandler(voteService)
+
+	// ==========================================
+	// Dev endpoints (ENABLE_DEV_ENDPOINTS=true only)
+	// ==========================================
 	if os.Getenv("ENABLE_DEV_ENDPOINTS") == "true" {
 		r.POST("/dev/mock-token", auth.MockTokenHandler())
 		log.Println("⚠️  Dev endpoints enabled — DO NOT use in production")
 	}
 
-	// --- API สำหรับระบบยืนยันตัวตนผู้มีสิทธิ์เลือกตั้ง ---
-	// ตรวจสอบเลขบัตรประชาชน 13 หลัก ว่ามีสิทธิ์โหวตหรือไม่
-	r.POST("/voter/verify", auth.VerifyVoterHandler(db))
-
-	// ขอรับรหัส OTP 6 หลัก เพื่อนำไปใช้ยืนยันการเข้าระบบ
-	r.POST("/voter/otp-request", auth.OTPRequestHandler(db))
-
-	// ยืนยัน OTP แล้วรับ JWT token
-	r.POST("/voter/otp-confirm", auth.OTPConfirmHandler(db))
-
-	// Info module — Layered Architecture (feat/info)
-	infoRepo := info.NewInfoRepository(db)
-	infoService := info.NewInfoService(infoRepo)
-	infoHandler := info.NewInfoHandler(infoService)
+	// ==========================================
+	// Public Routes
+	// ==========================================
+	r.POST("/voter/verify", authHandler.VerifyVoter)
+	r.POST("/voter/otp-request", authHandler.OTPRequest)
+	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
 
 	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
-	// ดูสถานะการเลือกตั้งปัจจุบัน (public)
 	r.GET("/election/config", electionHandler.GetConfig)
 
-	r.GET("/results/provinces/:provinces_name/areas/:area_id", result.GetProvinceAreaResultHandler(db))
-	// เพิ่ม API สำหรับผลโหวตแบบเรียลไทม์
-	r.GET("/results/areas", realtime.GetAllAreasVotesHandler(db))
-	//เพิ่ทม API สำหรับผลโหวตแบบเรียลไทม์แยกตามเขต
-	r.GET("/results/areas/:area_id", realtime.GetVoteResultByAreaHandler(db))
+	r.GET("/results/areas", realtimeHandler.GetAllAreasVotes)
+	r.GET("/results/areas/:area_id", resultHandler.GetAreaResult)
+	r.GET("/results/provinces/:provinces_name/areas/:area_id", resultHandler.GetProvinceAreaResult)
 
 	// ==========================================
-	// 🟡 Protected Routes (ต้องใช้ Token - สิทธิ์ Voter หรือ Admin)
+	// Protected Routes (JWT required)
 	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
@@ -119,7 +121,7 @@ func main() {
 	}
 
 	// ==========================================
-	// 🔴 Admin Routes (ต้องใช้ Token และต้องเป็น Role "admin")
+	// Admin Routes (JWT + role=admin)
 	// ==========================================
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
@@ -127,7 +129,6 @@ func main() {
 		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
-	// Start Server — ใช้ PORT จาก env (Railway inject ให้) หรือ default 8080
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

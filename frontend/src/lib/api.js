@@ -13,7 +13,7 @@ async function req(path, opts = {}) {
 export const api = {
   // Auth
   verify:     (citizen_id)             => req('/voter/verify',      { method:'POST', body: JSON.stringify({ citizen_id }) }),
-  otpRequest: (voter_id)               => req('/voter/otp-request', { method:'POST', body: JSON.stringify({ voter_id }) }),
+  otpRequest: (voter_id, delivery_channel, delivery_address) => req('/voter/otp-request', { method:'POST', body: JSON.stringify({ voter_id, delivery_channel, ...(delivery_address ? { delivery_address } : {}) }) }),
   otpConfirm: (otp_code, ref_code)     => req('/voter/otp-confirm', { method:'POST', body: JSON.stringify({ otp_code, ref_code }) }),
   me:         (token)                  => req('/voter/me',           { headers: { Authorization: `Bearer ${token}` } }),
 

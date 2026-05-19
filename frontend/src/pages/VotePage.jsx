@@ -146,12 +146,30 @@ export default function VotePage({ token, voterInfo, onVoted, onLogout }) {
     finally { setSubmitting(false) }
   }
 
+  const STATUS_STYLE = {
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    amber:   'bg-amber-50 text-amber-700 border-amber-200',
+    red:     'bg-red-50 text-red-700 border-red-200',
+    gray:    'bg-gray-50 text-gray-700 border-gray-200',
+    purple:  'bg-purple-50 text-purple-700 border-purple-200',
+  }
   const StatusBadge = () => {
-    const map = { OPEN:['emerald','เปิดโหวต','🟢'], PAUSED:['amber','หยุดชั่วคราว','⏸'], CLOSED:['red','ปิดแล้ว','🔴'], PREPARE:['gray','เตรียมการ','📋'], COUNTING:['purple','นับคะแนน','📊'] }
+    const map = {
+      OPEN:     ['emerald', 'เปิดโหวต',
+        <svg key="o" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>],
+      PAUSED:   ['amber',   'หยุดชั่วคราว',
+        <svg key="p" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5"/></svg>],
+      CLOSED:   ['red',     'ปิดแล้ว',
+        <svg key="c" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>],
+      PREPARE:  ['gray',    'เตรียมการ',
+        <svg key="pr" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>],
+      COUNTING: ['purple',  'นับคะแนน',
+        <svg key="cn" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25C17.496 2.25 18 2.754 18 3.375v16.5C18 20.496 17.496 21 16.875 21h-2.25A1.125 1.125 0 0113.5 19.875V3.375zm-9.75 9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z"/></svg>],
+    }
     const [c,l,i] = map[cfg?.status] || map.PREPARE
     return (
-      <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-${c}-50 text-${c}-700 border border-${c}-200`}>
-        <span>{i}</span><span>{l}</span>
+      <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border ${STATUS_STYLE[c]}`}>
+        {i}<span>{l}</span>
         {isOpen && !timer.expired && (
           <span className="ml-auto font-mono text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">
             {String(timer.h).padStart(2,'0')}:{String(timer.m).padStart(2,'0')}:{String(timer.s).padStart(2,'0')}

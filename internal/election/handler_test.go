@@ -221,6 +221,47 @@ func TestHandler_ServiceInternalError(t *testing.T) {
 //
 // ใช้ test ตรงๆ แทนการบังคับ service คืน plain error เพราะใน flow ปกติ
 // service คืน *AppError เสมอ (จึงไม่มีทางเข้า branch นี้ผ่าน HTTP request)
+// --- GetConfig ---
+
+func TestGetConfig_Success(t *testing.T) {
+	svc := &mockService{
+		resp: &ConfigResponse{ConfigID: 5, Status: "OPEN", IsActive: true},
+	}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	h := NewHandler(svc)
+	r.GET("/election/config", h.GetConfig)
+
+	req := httptest.NewRequest(http.MethodGet, "/election/config", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp["status"] != "success" {
+		t.Errorf("expected status=success, got %v", resp["status"])
+	}
+}
+
+func TestGetConfig_ServiceError(t *testing.T) {
+	svc := &mockService{err: internal(ErrConfigNotFound, nil)}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	h := NewHandler(svc)
+	r.GET("/election/config", h.GetConfig)
+
+	req := httptest.NewRequest(http.MethodGet, "/election/config", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
 func TestRespondError_NonAppErrorFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()

@@ -25,6 +25,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("create parties: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE candidates (
+		candidate_id INTEGER PRIMARY KEY AUTOINCREMENT,
 		candidate_no INTEGER, full_name TEXT,
 		party_id INTEGER, area_id INTEGER, biography TEXT
 	)`).Error; err != nil {

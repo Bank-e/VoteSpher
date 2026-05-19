@@ -60,7 +60,7 @@ func TestSubmitVote_Success(t *testing.T) {
 	service := NewVotingService(mockRepo)
 
 	// 3. เตรียมข้อมูล Request และทดสอบรัน
-	req := SubmitBallotRequest{CandidateNo: 1, PartyNo: 2}
+	req := SubmitBallotRequest{CandidateID: 1, PartyID: 2}
 	err := service.SubmitVote(123, 10, req)
 
 	// 4. Assert (ตรวจสอบผล)
@@ -86,7 +86,7 @@ func TestSubmitVote_Fail_SystemClosed(t *testing.T) {
 	service := NewVotingService(mockRepo)
 
 	// 3. รันเทส
-	req := SubmitBallotRequest{CandidateNo: 1, PartyNo: 2}
+	req := SubmitBallotRequest{CandidateID: 1, PartyID: 2}
 	err := service.SubmitVote(123, 10, req)
 
 	// 4. Assert
@@ -134,7 +134,7 @@ func TestSubmitVote_Fail_ConfigError(t *testing.T) {
 	mockRepo.On("GetActiveConfig").Return(nil, errors.New("db error"))
 	service := NewVotingService(mockRepo)
 
-	err := service.SubmitVote(123, 10, SubmitBallotRequest{})
+	err := service.SubmitVote(123, 10, SubmitBallotRequest{CandidateID: 0, PartyID: 0})
 	assert.Error(t, err)
 	appErr, _ := err.(*AppError)
 	assert.Equal(t, 500, appErr.Code)

@@ -259,3 +259,33 @@ func TestUpdateElectionConfig_NormalizesLowercaseStatus(t *testing.T) {
 		t.Errorf("expected normalized status OPEN, got %q", resp.Status)
 	}
 }
+
+
+func TestGetConfig_ServiceSuccess(t *testing.T) {
+	repo := &mockRepository{
+		configToReturn: &models.SystemConfig{
+			ID:       5,
+			Status:   "OPEN",
+			IsActive: true,
+		},
+	}
+	svc := NewService(repo)
+	cfg, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.ConfigID != 5 {
+		t.Errorf("expected ConfigID=5, got %d", cfg.ConfigID)
+	}
+	if cfg.Status != "OPEN" {
+		t.Errorf("expected Status=OPEN, got %s", cfg.Status)
+	}
+}
+
+func TestGetConfig_ServiceRepoError(t *testing.T) {
+	repo := &mockRepository{configErr: errors.New("db error")}
+	svc := NewService(repo)
+	if _, err := svc.GetConfig(context.Background()); err == nil {
+		t.Error("expected error from GetConfig")
+	}
+}
