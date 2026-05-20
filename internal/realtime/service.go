@@ -15,22 +15,27 @@ func NewRealtimeService(repo RealtimeRepository) RealtimeService {
 }
 
 func (s *realtimeService) GetAllAreasResult() (Response, error) {
+
 	areaRows, err := s.repo.GetAllAreasVotes()
 	if err != nil {
 		return Response{}, err
 	}
+
 	candidateRows, err := s.repo.GetTopCandidatesByArea(3)
 	if err != nil {
 		return Response{}, err
 	}
+
 	partyRows, err := s.repo.GetPartyVotes()
 	if err != nil {
 		return Response{}, err
 	}
+
 	return buildResponse(areaRows, candidateRows, partyRows), nil
 }
 
 func buildResponse(areaRows []AreaVoteRow, candidateRows []AreaCandidateRow, partyRows []PartyVoteRow) Response {
+
 	candidateMap := make(map[int][]CandidateResponse)
 	for _, c := range candidateRows {
 		candidateMap[c.AreaID] = append(candidateMap[c.AreaID], CandidateResponse{
@@ -43,6 +48,7 @@ func buildResponse(areaRows []AreaVoteRow, candidateRows []AreaCandidateRow, par
 
 	areas := []AreaResponse{}
 	totalVotes := 0
+
 	for _, r := range areaRows {
 		candidates := candidateMap[r.AreaID]
 		if candidates == nil {
