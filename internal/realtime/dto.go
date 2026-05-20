@@ -1,5 +1,7 @@
 package realtime
 
+// ===== Response DTOs =====
+
 type CandidateResponse struct {
 	CandidateNo   int    `json:"candidate_no"`
 	CandidateName string `json:"candidate_name"`

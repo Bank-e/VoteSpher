@@ -17,6 +17,7 @@ RUN go build -o votespher ./cmd/server/main.go
 # Stage 3: Runtime
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates tzdata
+ENV TZ=Asia/Bangkok
 WORKDIR /app
 COPY --from=backend-builder /app/votespher .
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist

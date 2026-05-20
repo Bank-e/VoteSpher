@@ -108,13 +108,11 @@ func (s *authService) RequestOTP(req OTPRequestRequest) (*OTPRequestResponse, er
 		return nil, fmt.Errorf("สร้าง OTP ไม่สำเร็จ: %w", err)
 	}
 
-	// determine target address: custom override or stored value
 	targetEmail := req.DeliveryAddress
 	targetPhone := req.DeliveryAddress
 
 	switch mode {
 	case "mock":
-		// mock mode — return OTP in response, no real delivery
 		maskedContact := ""
 		if req.DeliveryChannel == "sms" {
 			if targetPhone == "" {

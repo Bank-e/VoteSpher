@@ -6,13 +6,13 @@ type VerifyVoterRequest struct {
 }
 
 type VoterInfo struct {
-	Name         string `json:"name"`
-	AreaID       uint   `json:"area_id"`
-	AreaName     string `json:"area_name"`
-	Province     string `json:"province"`
-	IsVoted      bool   `json:"is_voted"`
-	MaskedEmail  string `json:"masked_email"`  // e.g. "p***@dome.tu.ac.th"
-	MaskedPhone  string `json:"masked_phone"`  // e.g. "08*****592"
+	Name        string `json:"name"`
+	AreaID      uint   `json:"area_id"`
+	AreaName    string `json:"area_name"`
+	Province    string `json:"province"`
+	IsVoted     bool   `json:"is_voted"`
+	MaskedEmail string `json:"masked_email"`
+	MaskedPhone string `json:"masked_phone"`
 }
 
 type VerifyVoterResponse struct {
@@ -39,8 +39,8 @@ type OTPRequestRequest struct {
 }
 
 type OTPRequestResponse struct {
-	OTPCode      string `json:"otp_code,omitempty"` // แสดงเฉพาะโหมด mock
-	RefCode      string `json:"ref_code"`
+	OTPCode       string `json:"otp_code,omitempty"` // แสดงเฉพาะโหมด mock
+	RefCode       string `json:"ref_code"`
 	MaskedContact string `json:"masked_contact"` // where OTP was sent (masked)
 }
 

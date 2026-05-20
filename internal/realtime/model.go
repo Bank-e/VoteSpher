@@ -1,5 +1,7 @@
 package realtime
 
+// ===== Row types for DB queries =====
+
 type AreaVoteRow struct {
 	AreaID     int
 	AreaName   string

@@ -144,8 +144,7 @@ func TestGetAreaResultHandler_NoVotes(t *testing.T) {
 	}
 }
 
-// setupIsolatedDB creates a private in-memory SQLite DB (not cache=shared) so province
-// tests don't collide with data seeded by the GetAreaResult tests.
+// setupIsolatedDB creates a private in-memory SQLite DB so province tests don't collide.
 func setupIsolatedDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{

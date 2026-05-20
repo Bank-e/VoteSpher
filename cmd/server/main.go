@@ -28,6 +28,7 @@ func main() {
 		migration.Run(db)
 		return
 	}
+
 	if os.Getenv("RUN_SEED") == "true" {
 		migration.SeedData(db)
 		return
@@ -135,7 +136,6 @@ func main() {
 		r.Static("/assets", "./frontend/dist/assets")
 		r.StaticFile("/favicon.ico", "./frontend/dist/favicon.ico")
 		r.NoRoute(func(c *gin.Context) {
-			// API paths return 404 JSON; everything else serves SPA
 			p := c.Request.URL.Path
 			apiPrefixes := []string{"/voter", "/ballot", "/election", "/results", "/candidates", "/parties", "/dev"}
 			for _, prefix := range apiPrefixes {

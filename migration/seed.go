@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Helper functions สำหรับจัดการ Pointer และ Time
 func uintPtr(v uint) *uint {
 	return &v
 }
@@ -45,7 +46,6 @@ func SeedData(db *gorm.DB) {
 
 	log.Println("🧹 Clearing old data — drop + recreate affected tables...")
 	db.Exec("SET FOREIGN_KEY_CHECKS = 0;")
-	// Drop tables that may have schema mismatches, then let AutoMigrate recreate them
 	db.Exec("DROP TABLE IF EXISTS votes;")
 	db.Exec("DROP TABLE IF EXISTS audit_logs;")
 	db.Exec("DROP TABLE IF EXISTS system_configs;")
@@ -57,7 +57,6 @@ func SeedData(db *gorm.DB) {
 	db.Exec("DROP TABLE IF EXISTS areas;")
 	db.Exec("DROP TABLE IF EXISTS provinces;")
 	db.Exec("SET FOREIGN_KEY_CHECKS = 1;")
-	// Recreate with current schema
 	if err := db.AutoMigrate(
 		&models.Province{}, &models.Area{}, &models.Party{}, &models.Voter{},
 		&models.Candidate{}, &models.OTP{}, &models.Admin{},
@@ -118,7 +117,6 @@ func SeedData(db *gorm.DB) {
 		{CitizenIDHash: "342dcd58481f26e0109717a0930621f769707e9091da3697a2312c8973f1b130", AreaID: areas[0].ID, Email: "voter01@test.com", PhoneNumber: "0811111111", IsVoted: false},
 		{CitizenIDHash: "59194e4bf88deb95b5b4e6eb6b09463bdc1592aa13c943f470a148b98974e8ab", AreaID: areas[0].ID, Email: "voter02@test.com", PhoneNumber: "0812222222", IsVoted: false},
 		{CitizenIDHash: "02cde367f2cdd9210f7edb4ddf486032067f7067ac84891a22efa7d9b77de8af", AreaID: areas[0].ID, Email: "voter03@test.com", PhoneNumber: "0813333333", IsVoted: false},
-		// voter_id 4: hash ของ citizen 1100100000001 → test account หลัก (email จริง)
 		{CitizenIDHash: "a69e7a3ee0ac644de72323c3932c528921fdf8319630470f753dbcdd09e7becb", AreaID: areas[0].ID, Email: "piyachat.sal@dome.tu.ac.th", PhoneNumber: "0929400592", IsVoted: false},
 		{CitizenIDHash: "5aba4c653982bfe235c2213b754348b50e8f2d61be0010a6923f18032102dc15", AreaID: areas[1].ID, Email: "voter05@test.com", PhoneNumber: "0821111111", IsVoted: false},
 		{CitizenIDHash: "051b71582088500660bc221f9b2c3971820a798f524a69bade02a24a95e5417e", AreaID: areas[1].ID, Email: "voter06@test.com", PhoneNumber: "0822222222", IsVoted: false},

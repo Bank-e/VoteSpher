@@ -7,14 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-
 	"votespher/internal/models"
 	"votespher/pkg"
 )
 
 var tokenGenerator = pkg.GenerateToken
 
-// AuthHandler handles auth HTTP endpoints via AuthService
 type AuthHandler struct {
 	service AuthService
 	db      *gorm.DB
@@ -148,8 +146,7 @@ func VoterMeHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// OTPRequestHandler kept for backward compat — now delegates to AuthHandler.OTPRequest
-// Remove direct db dependency; used only in old-style route registration if any
+// OTPRequestHandler kept for backward compat
 func OTPRequestHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req OTPRequestRequest
