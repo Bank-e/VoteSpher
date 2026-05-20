@@ -9,38 +9,39 @@ import (
 	"strings"
 )
 
-// SendSMS sends an SMS using ThaiBulkSMS
+var (
+	httpClient  = &http.Client{}
+	smsEndpoint = "https://api-v2.thaibulksms.com/sms"
+)
+
+// SendSMS sends an SMS via ThaiBulkSMS API
 func SendSMS(to string, body string) error {
 	apiKey := os.Getenv("THAIBULKSMS_API_KEY")
 	apiSecret := os.Getenv("THAIBULKSMS_API_SECRET")
 	sender := os.Getenv("THAIBULKSMS_SENDER")
 
 	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("THAIBULKSMS credentials are not set in environment variables")
+		return fmt.Errorf("THAIBULKSMS_API_KEY และ THAIBULKSMS_API_SECRET ต้องตั้งค่าก่อนใช้งาน")
 	}
 	if sender == "" {
-		sender = "SMS" // Default sender
+		sender = "SMS"
 	}
 
-	apiUrl := "https://api-v2.thaibulksms.com/sms"
-
-	// ThaiBulkSMS Payload
 	data := url.Values{}
-	data.Set("msisdn", to) // ThaiBulkSMS รองรับเบอร์ 08xxxxxxxx ได้โดยตรง
+	data.Set("msisdn", to)
 	data.Set("message", body)
 	data.Set("sender", sender)
 
-	req, err := http.NewRequest("POST", apiUrl, strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", smsEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create SMS request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(apiKey, apiSecret) // ส่ง Auth ผ่าน Header แบบ Basic Auth
+	req.SetBasicAuth(apiKey, apiSecret)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request to ThaiBulkSMS: %w", err)
+		return fmt.Errorf("ส่ง SMS ไม่สำเร็จ: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -48,6 +49,5 @@ func SendSMS(to string, body string) error {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("ThaiBulkSMS error (status %d): %s", resp.StatusCode, string(respBody))
 	}
-
 	return nil
 }

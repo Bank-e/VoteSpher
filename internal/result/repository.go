@@ -20,7 +20,6 @@ func NewResultRepository(db *gorm.DB) ResultRepository {
 
 func (r *resultRepository) GetVoteResultByArea(areaID uint) (AreaResultResponse, error) {
 	var area models.Area
-
 	if err := r.db.Where("area_id = ?", areaID).First(&area).Error; err != nil {
 		return AreaResultResponse{}, err
 	}

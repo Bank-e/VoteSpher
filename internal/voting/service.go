@@ -42,31 +42,26 @@ func NewVotingService(repo VotingRepository) VotingService {
 // SubmitVote จัดการขั้นตอนและกฎเกณฑ์ก่อนการลงคะแนน
 func (s *votingService) SubmitVote(voterID uint, areaID uint, req SubmitBallotRequest) error {
 
-	// 1. ดึงการตั้งค่าระบบจาก Repository
+	// 1. ดึงการตั้งค่าระบบและตรวจสอบสถานะก่อนรับโหวต
 	config, err := s.repo.GetActiveConfig()
 	if err != nil {
-		// กรณีไม่พบการตั้งค่า ส่ง 500 กลับไป
 		return NewAppError(500, "ไม่พบการตั้งค่าระบบเลือกตั้งที่ใช้งานอยู่")
 	}
-
-	// 2. ด่านตรวจสอบสถานะระบบและเวลาการลงคะแนน
 	now := time.Now()
-	statusLower := strings.ToLower(config.Status) // แปลงเป็นตัวพิมพ์เล็กป้องกันปัญหา OPEN vs open
-
-	if statusLower != "open" || now.Before(config.StartTime) || now.After(config.EndTime) {
+	if strings.ToLower(config.Status) != "open" || now.Before(config.StartTime) || now.After(config.EndTime) {
 		return NewAppError(403, "อยู่นอกเวลาการลงคะแนน หรือระบบปิดรับคะแนนแล้ว")
 	}
 
 	// 3. เตรียมข้อมูลผลโหวต (ประกอบร่าง Data)
 	var candidateID *uint
-	if req.CandidateNo > 0 {
-		cID := uint(req.CandidateNo)
+	if req.CandidateID > 0 {
+		cID := uint(req.CandidateID)
 		candidateID = &cID
 	}
 
 	var partyID *uint
-	if req.PartyNo > 0 {
-		pID := uint(req.PartyNo)
+	if req.PartyID > 0 {
+		pID := uint(req.PartyID)
 		partyID = &pID
 	}
 

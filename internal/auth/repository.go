@@ -2,7 +2,7 @@ package auth
 
 import (
 	"time"
-	"votespher/internal/models" // อันนี้คือ DB Models (Voter, OTP, Area)
+	"votespher/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -10,10 +10,12 @@ import (
 type AuthRepository interface {
 	FindOTPByRefCode(refCode string) (*models.OTP, error)
 	MarkOTPAsUsed(otpID uint) error
+	UpdateOTPAttempts(otpID uint, attempts int, markUsed bool) error
 	FindVoterByID(voterID uint) (*models.Voter, error)
 	FindVoterByCitizenIDHash(citizenIDHash string) (*models.Voter, error)
 	CreateOTP(otp *models.OTP) error
-	CheckIsAdmin(voterID uint) (bool)
+	CheckIsAdmin(voterID uint) bool
+	FindVoterWithArea(voterID uint) (*models.Voter, error)
 }
 
 type authRepository struct {
@@ -40,6 +42,14 @@ func (r *authRepository) MarkOTPAsUsed(otpID uint) error {
 		Update("is_used", true).Error
 }
 
+func (r *authRepository) UpdateOTPAttempts(otpID uint, attempts int, markUsed bool) error {
+	updates := map[string]interface{}{"attempts": attempts}
+	if markUsed {
+		updates["is_used"] = true
+	}
+	return r.db.Model(&models.OTP{}).Where("otp_id = ?", otpID).Updates(updates).Error
+}
+
 func (r *authRepository) FindVoterByID(voterID uint) (*models.Voter, error) {
 	var voter models.Voter
 	err := r.db.First(&voter, voterID).Error
@@ -62,9 +72,17 @@ func (r *authRepository) CreateOTP(otp *models.OTP) error {
 	return r.db.Create(otp).Error
 }
 
-// CheckIsAdmin ตรวจสอบว่าผู้โหวตคนนี้เป็นแอดมินหรือไม่
 func (r *authRepository) CheckIsAdmin(voterID uint) bool {
-    var count int64
-    r.db.Model(&models.Admin{}).Where("voter_id = ?", voterID).Count(&count)
-    return count > 0
+	var count int64
+	r.db.Model(&models.Admin{}).Where("voter_id = ?", voterID).Count(&count)
+	return count > 0
+}
+
+func (r *authRepository) FindVoterWithArea(voterID uint) (*models.Voter, error) {
+	var voter models.Voter
+	err := r.db.Preload("Area.Province").First(&voter, voterID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &voter, nil
 }

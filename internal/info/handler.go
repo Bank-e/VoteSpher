@@ -2,6 +2,7 @@ package info
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -35,7 +36,8 @@ func (h *InfoHandler) GetCandidatesHandler() http.HandlerFunc {
 
 		result, err := h.service.GetCandidates(areaID)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			log.Printf("GetCandidates error: %v", err)
+			http.Error(w, "เกิดข้อผิดพลาดภายในระบบ", http.StatusInternalServerError)
 			return
 		}
 
@@ -50,7 +52,8 @@ func (h *InfoHandler) GetPartiesHandler() http.HandlerFunc {
 
 		result, err := h.service.GetParties()
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			log.Printf("GetParties error: %v", err)
+			http.Error(w, "เกิดข้อผิดพลาดภายในระบบ", http.StatusInternalServerError)
 			return
 		}
 

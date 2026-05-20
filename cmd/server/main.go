@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"votespher/config"
 	"votespher/internal/auth"
 	"votespher/internal/election"
@@ -12,6 +13,7 @@ import (
 	"votespher/internal/result"
 	"votespher/internal/voting"
 	"votespher/migration"
+	"votespher/pkg"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +21,8 @@ import (
 func main() {
 	config.LoadEnv()
 	db := config.ConnectDB()
+
+	pkg.StartEmailWorker(3)
 
 	if os.Getenv("RUN_MIGRATION") == "true" {
 		migration.Run(db)
@@ -29,28 +33,49 @@ func main() {
 		migration.SeedData(db)
 		return
 	}
+	if os.Getenv("RUN_ADD_TEST_ACCOUNTS") == "true" {
+		migration.SeedTestAccounts(db)
+		return
+	}
 
 	r := gin.Default()
 
+	// CORS middleware
+	r.Use(func(c *gin.Context) {
+		allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+		if allowedOrigin == "" {
+			allowedOrigin = "*"
+		}
+		c.Header("Access-Control-Allow-Origin", allowedOrigin)
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
+	r.Use(middleware.RateLimit())
+
 	// ==========================================
-	// Dependency Injection (DI) Setup
+	// Dependency Injection
 	// ==========================================
 	authRepo := auth.NewAuthRepository(db)
 	authService := auth.NewAuthService(authRepo)
-	authHandler := auth.NewAuthHandler(authService)
+	authHandler := auth.NewAuthHandler(authService, db)
 
 	electionRepo := election.NewRepository(db)
 	electionSvc := election.NewService(electionRepo)
 	electionHandler := election.NewHandler(electionSvc)
-
 
 	infoRepo := info.NewInfoRepository(db)
 	infoService := info.NewInfoService(infoRepo)
 	infoHandler := info.NewInfoHandler(infoService)
 
 	resultRepo := result.NewResultRepository(db)
-	resultService := result.NewResultService(resultRepo)
-	resultHandler := result.NewResultHandler(resultService)
+	resultSvc := result.NewResultService(resultRepo)
+	resultHandler := result.NewResultHandler(resultSvc)
 
 	realtimeRepo := realtime.NewRealtimeRepository(db)
 	realtimeSvc := realtime.NewRealtimeService(realtimeRepo)
@@ -59,7 +84,15 @@ func main() {
 	voteRepo := voting.NewVotingRepository(db)
 	voteService := voting.NewVotingService(voteRepo)
 	voteHandler := voting.NewVotingHandler(voteService)
-	
+
+	// ==========================================
+	// Dev endpoints (ENABLE_DEV_ENDPOINTS=true only)
+	// ==========================================
+	if os.Getenv("ENABLE_DEV_ENDPOINTS") == "true" {
+		r.POST("/dev/mock-token", auth.MockTokenHandler())
+		log.Println("⚠️  Dev endpoints enabled — DO NOT use in production")
+	}
+
 	// ==========================================
 	// Public Routes
 	// ==========================================
@@ -67,27 +100,30 @@ func main() {
 	r.POST("/voter/otp-request", authHandler.OTPRequest)
 	r.POST("/voter/otp-confirm", authHandler.OTPConfirm)
 
-
 	r.GET("/candidates", gin.WrapH(infoHandler.GetCandidatesHandler()))
 	r.GET("/parties", gin.WrapH(infoHandler.GetPartiesHandler()))
 
-	r.GET("/results/area/:id", resultHandler.GetAreaResult)
-	r.GET("/results/areas", realtimeHandler.GetAllAreasVotes)
+	r.GET("/election/config", electionHandler.GetConfig)
 
+	r.GET("/results/areas", realtimeHandler.GetAllAreasVotes)
+	r.GET("/results/areas/:area_id", resultHandler.GetAreaResult)
+	r.GET("/results/provinces/:provinces_name/areas/:area_id", resultHandler.GetProvinceAreaResult)
 
 	// ==========================================
-	// Protected Routes (Require Login)
+	// Protected Routes (JWT required)
 	// ==========================================
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 	{
-		protected.POST("/ballot/submit", voteHandler.SubmitBallotHandler())
+		protected.GET("/voter/me", auth.VoterMeHandler(db))
+		protected.POST("/ballot/submit",
+			middleware.AuditLog(db, "SUBMIT_VOTE"),
+			voteHandler.SubmitBallotHandler())
 		protected.GET("/ballot/status", voteHandler.GetBallotStatusHandler())
 	}
 
-
 	// ==========================================
-	// Admin Routes
+	// Admin Routes (JWT + role=admin)
 	// ==========================================
 	admin := r.Group("/")
 	admin.Use(middleware.RequireAuth(), middleware.RequireRole("admin"))
@@ -95,6 +131,27 @@ func main() {
 		admin.PATCH("/election/config", electionHandler.UpdateConfig)
 	}
 
-	log.Println("Server is running on port 8080...")
-	r.Run(":8080")
+	// Serve frontend static files (single-service deployment)
+	if _, err := os.Stat("./frontend/dist"); err == nil {
+		r.Static("/assets", "./frontend/dist/assets")
+		r.StaticFile("/favicon.ico", "./frontend/dist/favicon.ico")
+		r.NoRoute(func(c *gin.Context) {
+			p := c.Request.URL.Path
+			apiPrefixes := []string{"/voter", "/ballot", "/election", "/results", "/candidates", "/parties", "/dev"}
+			for _, prefix := range apiPrefixes {
+				if strings.HasPrefix(p, prefix) {
+					c.JSON(404, gin.H{"error": "not found"})
+					return
+				}
+			}
+			c.File("./frontend/dist/index.html")
+		})
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Server is running on port %s...", port)
+	r.Run(":" + port)
 }

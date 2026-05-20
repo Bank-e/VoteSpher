@@ -81,7 +81,7 @@ func (h *VotingHandler) SubmitBallotHandler() gin.HandlerFunc {
 
 			// กรณีเกิด Error อื่นๆ ที่หลุดรอดมา (เช่น Database พังฉับพลัน)
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"message":    "เกิดข้อผิดพลาดภายในระบบ: " + err.Error(),
+				"message": "เกิดข้อผิดพลาดภายในระบบ",
 			})
 			return
 		}
@@ -127,7 +127,7 @@ func (h *VotingHandler) GetBallotStatusHandler() gin.HandlerFunc {
 			// กรณี Error ปกติที่ไม่ได้ทำ Custom ไว้
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
-				"message": "เกิดข้อผิดพลาดภายในระบบ: " + err.Error(),
+				"message": "เกิดข้อผิดพลาดภายในระบบ",
 			})
 			return
 		}

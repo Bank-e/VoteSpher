@@ -1,11 +1,8 @@
 package realtime
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestBuildResponse(t *testing.T) {
-
 	areaRows := []AreaVoteRow{
 		{AreaID: 1, AreaName: "A", TotalVotes: 100},
 		{AreaID: 2, AreaName: "B", TotalVotes: 200},
@@ -24,37 +21,35 @@ func TestBuildResponse(t *testing.T) {
 
 	resp := buildResponse(areaRows, candidateRows, partyRows)
 
-	// ✅ check total votes
+	// check total votes
 	if resp.TotalVotes != 300 {
 		t.Errorf("expected total votes 300, got %d", resp.TotalVotes)
 	}
-
-	// ✅ check areas length
 	if len(resp.Areas) != 2 {
 		t.Errorf("expected 2 areas, got %d", len(resp.Areas))
 	}
 
-	// ✅ check candidates in area 1
+	// check candidates in area 1
 	if len(resp.Areas[0].Candidates) != 2 {
 		t.Errorf("expected 2 candidates in area 1, got %d", len(resp.Areas[0].Candidates))
 	}
 
-	// ✅ check candidates in area 2
+	// check candidates in area 2
 	if len(resp.Areas[1].Candidates) != 1 {
 		t.Errorf("expected 1 candidate in area 2, got %d", len(resp.Areas[1].Candidates))
 	}
 
-	// ✅ check party length
+	// check party length
 	if len(resp.Party) != 2 {
 		t.Errorf("expected 2 parties, got %d", len(resp.Party))
 	}
 
-	// ✅ check party name
+	// check party name
 	if resp.Party[0].PartyName != "Party X" {
 		t.Errorf("expected first party 'Party X', got '%s'", resp.Party[0].PartyName)
 	}
 
-	// ✅ check last_updated not empty
+	// check last_updated not empty
 	if resp.LastUpdated == "" {
 		t.Error("expected last_updated to be set")
 	}

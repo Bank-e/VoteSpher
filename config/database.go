@@ -14,24 +14,20 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// LoadEnv โหลดตัวแปรจากไฟล์ .env
 func LoadEnv() {
 	if err := godotenv.Load(); err != nil {
 		log.Println(" .env not found, using system env instead")
 	}
 }
 
-// ConnectDB เป็นฟังก์ชันหลัก (Entry point) ที่ชี้ว่าจะไป Cloud หรือ Local
 func ConnectDB() *gorm.DB {
 	dbMode := os.Getenv("DB_MODE")
-	
 	if dbMode == "cloud" {
 		return ConnectCloudDB()
 	}
-	return ConnectLocalDB() // ค่า Default หากไม่ได้ระบุให้เป็น Local
+	return ConnectLocalDB()
 }
 
-// ConnectLocalDB สำหรับเชื่อมต่อ Docker/Local (ดึงค่า LOCAL_*)
 func ConnectLocalDB() *gorm.DB {
 	host := os.Getenv("LOCAL_DB_HOST")
 	port := os.Getenv("LOCAL_DB_PORT")
@@ -48,26 +44,31 @@ func ConnectLocalDB() *gorm.DB {
 	return openGormConnection(dsn)
 }
 
-// ConnectCloudDB สำหรับเชื่อมต่อ Cloud/Aiven (ดึงค่า CLOUD_*)
 func ConnectCloudDB() *gorm.DB {
 	host := os.Getenv("CLOUD_DB_HOST")
 	port := os.Getenv("CLOUD_DB_PORT")
 	user := os.Getenv("CLOUD_DB_USER")
 	password := os.Getenv("CLOUD_DB_PASSWORD")
 	dbname := os.Getenv("CLOUD_DB_NAME")
-	caCert := os.Getenv("CLOUD_DB_CA_CERT")
+	caCertPath := os.Getenv("CLOUD_DB_CA_CERT")
 
-	if caCert == "" {
+	if caCertPath == "" {
 		log.Fatal("CLOUD_DB_CA_CERT is required for cloud mode")
 	}
 
-	// โหลด CA Certificate
-	rootCertPool := x509.NewCertPool()
-	pem, err := os.ReadFile(caCert)
-	if err != nil {
-		log.Fatalf("Failed to read CA cert: %v", err)
+	var pemBytes []byte
+	if content := os.Getenv("DB_CA_CERT_CONTENT"); content != "" {
+		pemBytes = []byte(content)
+	} else {
+		var err error
+		pemBytes, err = os.ReadFile(caCertPath)
+		if err != nil {
+			log.Fatalf("Failed to read CA cert: %v", err)
+		}
 	}
-	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+
+	rootCertPool := x509.NewCertPool()
+	if ok := rootCertPool.AppendCertsFromPEM(pemBytes); !ok {
 		log.Fatal("Failed to append CA cert")
 	}
 
@@ -84,17 +85,18 @@ func ConnectCloudDB() *gorm.DB {
 	return openGormConnection(dsn)
 }
 
-// openGormConnection เป็น Helper function จัดการเรื่องการเปิด DB และ Connection Pool
 func openGormConnection(dsn string) *gorm.DB {
 	db, err := gorm.Open(gormMySQL.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info), // แสดง SQL query ใน console
+		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
-	// Connection Pool Settings
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying DB: %v", err)
+	}
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(5)
 

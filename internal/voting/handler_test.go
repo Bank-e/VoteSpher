@@ -57,7 +57,7 @@ func TestSubmitBallotHandler_Success(t *testing.T) {
 	c.Set("area_id", uint(10))
 
 	// จำลอง Body (JSON)
-	reqBody := SubmitBallotRequest{CandidateNo: 1, PartyNo: 2}
+	reqBody := SubmitBallotRequest{CandidateID: 1, PartyID: 2}
 	jsonValue, _ := json.Marshal(reqBody)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(jsonValue))
 	c.Request.Header.Set("Content-Type", "application/json")
@@ -87,7 +87,7 @@ func TestSubmitBallotHandler_Unauthorized(t *testing.T) {
 
 	// ❌ ไม่ได้ Set voter_id เข้าไปใน Context (จำลองเคส Token ไม่มีค่า)
 	
-	reqBody := SubmitBallotRequest{CandidateNo: 1, PartyNo: 2}
+	reqBody := SubmitBallotRequest{CandidateID: 1, PartyID: 2}
 	jsonValue, _ := json.Marshal(reqBody)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(jsonValue))
 	c.Request.Header.Set("Content-Type", "application/json")
@@ -145,8 +145,10 @@ func TestSubmitBallotHandler_InvalidTypeInContext(t *testing.T) {
 	// แกล้งใส่ voter_id เป็นข้อความ (String) แทนที่จะเป็นตัวเลข (uint)
 	c.Set("voter_id", "NOT_A_NUMBER")
 	c.Set("area_id", uint(10))
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
-	
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
 	handler.SubmitBallotHandler()(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
@@ -178,8 +180,10 @@ func TestSubmitBallotHandler_InvalidAreaIDType(t *testing.T) {
 
 	c.Set("voter_id", uint(123))
 	// แกล้งใส่ area_id เป็นข้อความแทนที่จะเป็นตัวเลข
-	c.Set("area_id", "NOT_A_NUMBER") 
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
+	c.Set("area_id", "NOT_A_NUMBER")
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.SubmitBallotHandler()(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -197,7 +201,9 @@ func TestSubmitBallotHandler_GenericError(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Set("voter_id", uint(123))
 	c.Set("area_id", uint(10))
-	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBufferString(`{"candidate_no": 1}`))
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
 
 	handler.SubmitBallotHandler()(c)
 	
@@ -230,6 +236,57 @@ func TestGetBallotStatusHandler_InvalidVoterIDType(t *testing.T) {
 
 	handler.GetBallotStatusHandler()(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestSubmitBallotHandler_NoAreaID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewVotingHandler(new(MockVotingService))
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Set("voter_id", uint(123))
+	// area_id not set → !existsArea branch
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SubmitBallotHandler()(c)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestSubmitBallotHandler_AppError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := new(MockVotingService)
+	handler := NewVotingHandler(mockService)
+
+	mockService.On("SubmitVote", uint(123), uint(10), mock.Anything).Return(NewAppError(403, "already voted"))
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("voter_id", uint(123))
+	c.Set("area_id", uint(10))
+	body, _ := json.Marshal(map[string]int{"candidate_no": 1, "party_no": 1})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/ballot/submit", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SubmitBallotHandler()(c)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGetBallotStatusHandler_AppError2(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockService := new(MockVotingService)
+	handler := NewVotingHandler(mockService)
+
+	mockService.On("GetBallotStatus", uint(123)).Return(nil, NewAppError(403, "forbidden"))
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("voter_id", uint(123))
+	c.Request, _ = http.NewRequest(http.MethodGet, "/ballot/status", nil)
+
+	handler.GetBallotStatusHandler()(c)
+	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestGetBallotStatusHandler_GenericError(t *testing.T) {

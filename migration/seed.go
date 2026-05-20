@@ -2,6 +2,7 @@ package migration
 
 import (
 	"log"
+	"os"
 	"time"
 	"votespher/internal/models"
 
@@ -33,34 +34,42 @@ func parseTime(timeStr string) time.Time {
 }
 
 func SeedData(db *gorm.DB) {
-	var count int64
-	db.Model(&models.Voter{}).Count(&count)
-	if count > 0 {
-		log.Println("✅ Data already seeded. Skipping...")
-		return
+	force := os.Getenv("FORCE_SEED") == "true"
+	if !force {
+		var count int64
+		db.Model(&models.Voter{}).Count(&count)
+		if count > 0 {
+			log.Println("✅ Data already seeded. Skipping... (set FORCE_SEED=true to re-seed)")
+			return
+		}
 	}
 
-	log.Println("🧹 Clearing old data and resetting tables...")
-
-	// ปิด Foreign Key ชั่วคราวเพื่อ Truncate ข้อมูลได้โดยไม่ติด Constraint
+	log.Println("🧹 Clearing old data — drop + recreate affected tables...")
 	db.Exec("SET FOREIGN_KEY_CHECKS = 0;")
-	db.Exec("TRUNCATE TABLE votes;")
-	db.Exec("TRUNCATE TABLE system_configs;")
-	db.Exec("TRUNCATE TABLE admins;")
-	db.Exec("TRUNCATE TABLE otps;")
-	db.Exec("TRUNCATE TABLE voters;")
-	db.Exec("TRUNCATE TABLE candidates;")
-	db.Exec("TRUNCATE TABLE parties;")
-	db.Exec("TRUNCATE TABLE areas;")
-	db.Exec("TRUNCATE TABLE provinces;")
+	db.Exec("DROP TABLE IF EXISTS votes;")
+	db.Exec("DROP TABLE IF EXISTS audit_logs;")
+	db.Exec("DROP TABLE IF EXISTS system_configs;")
+	db.Exec("DROP TABLE IF EXISTS admins;")
+	db.Exec("DROP TABLE IF EXISTS otps;")
+	db.Exec("DROP TABLE IF EXISTS voters;")
+	db.Exec("DROP TABLE IF EXISTS candidates;")
+	db.Exec("DROP TABLE IF EXISTS parties;")
+	db.Exec("DROP TABLE IF EXISTS areas;")
+	db.Exec("DROP TABLE IF EXISTS provinces;")
 	db.Exec("SET FOREIGN_KEY_CHECKS = 1;")
+	if err := db.AutoMigrate(
+		&models.Province{}, &models.Area{}, &models.Party{}, &models.Voter{},
+		&models.Candidate{}, &models.OTP{}, &models.Admin{},
+		&models.SystemConfig{}, &models.Vote{}, &models.AuditLog{},
+	); err != nil {
+		log.Fatalf("re-migrate failed: %v", err)
+	}
+	log.Println("✅ Tables recreated")
 
 	log.Println("🌱 Seeding Base Mock Data...")
 
 	// 1. Provinces
-	provinces := []models.Province{
-		{ProvinceName: "กรุงเทพมหานคร"},
-	}
+	provinces := []models.Province{{ProvinceName: "กรุงเทพมหานคร"}}
 	if err := db.Create(&provinces).Error; err != nil {
 		log.Fatalf("❌ Failed to seed provinces: %v", err)
 	}
@@ -89,83 +98,50 @@ func SeedData(db *gorm.DB) {
 		log.Fatalf("❌ Failed to seed areas: %v", err)
 	}
 
-	// 3. Parties (พรรคการเมืองหลัก)
+	// 3. Parties
 	parties := []models.Party{
-		{PartyNo: 1, PartyName: "พรรคประชาชน", LogoURL: "https://media.thairath.co.th/image/JRBsXLw1vXQ5sB7aeUwepRqs1a2hJoWnkygtep1V2yo0tUoPpoe9vA1.jpg"},
-		{PartyNo: 2, PartyName: "พรรคเพื่อไทย", LogoURL: "https://yt3.googleusercontent.com/dtPvavXvlxB6kiY4LB1hUjrvVV6MlJuXV1yOjjBEkAEEM1jdbHanzuTitzS3L0HbUSlhbwaZOA=s900-c-k-c0x00ffffff-no-rj"},
-		{PartyNo: 3, PartyName: "พรรคภูมิใจไทย", LogoURL: "https://www.infoquest.co.th/dxt-content/uploads/2025/06/20250618_-1024x576.png"},
-		{PartyNo: 4, PartyName: "พรรคกล้าธรรม", LogoURL: "https://upload.wikimedia.org/wikipedia/th/thumb/c/cc/KlaThamParty_logo_%282025%29.jpg/250px-KlaThamParty_logo_%282025%29.jpg"},
+		{PartyNo: 1, PartyName: "พรรคประชาชน", LogoURL: "/images/parties/party1_prachacha.jpg"},
+		{PartyNo: 2, PartyName: "พรรคเพื่อไทย", LogoURL: "/images/parties/party2_phuathai.jpg"},
+		{PartyNo: 3, PartyName: "พรรคภูมิใจไทย", LogoURL: "/images/parties/party3_bhumjaithai.jpg"},
+		{PartyNo: 4, PartyName: "พรรคกล้าธรรม", LogoURL: "/images/parties/party4_klatharm.jpg"},
 	}
 	if err := db.Create(&parties).Error; err != nil {
 		log.Fatalf("❌ Failed to seed parties: %v", err)
 	}
 
-	// ==========================================
-	// เรียกใช้งานไฟล์แยก: สร้างข้อมูลผู้สมัคร (seed_candidates.go)
-	// ==========================================
+	// 4. Candidates (จาก seed_candidates.go)
 	candidates := SeedCandidates(db, areas, parties)
 
-	// 4. Voters (ข้อมูลจำลองผู้มีสิทธิเลือกตั้ง)
+	// 5. Voters (เก็บ CitizenIDHash เดิมจาก main branch เพื่อให้ test accounts ยังใช้ได้)
 	voters := []models.Voter{
-		{CitizenIDHash: "342dcd58481f26e0109717a0930621f769707e9091da3697a2312c8973f1b130", AreaID: areas[0].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 08:30:00")},
-		{CitizenIDHash: "59194e4bf88deb95b5b4e6eb6b09463bdc1592aa13c943f470a148b98974e8ab", AreaID: areas[0].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 09:15:00")},
-		{CitizenIDHash: "02cde367f2cdd9210f7edb4ddf486032067f7067ac84891a22efa7d9b77de8af", AreaID: areas[0].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 10:05:00")},
-		{CitizenIDHash: "a69e7a3ee0ac644de72323c3932c528921fdf8319630470f753dbcdd09e7becb", AreaID: areas[0].ID, PhoneNumber: "0929400592", IsVoted: false, VotedAt: nil},
-		{CitizenIDHash: "5aba4c653982bfe235c2213b754348b50e8f2d61be0010a6923f18032102dc15", AreaID: areas[1].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 08:45:00")},
-		{CitizenIDHash: "051b71582088500660bc221f9b2c3971820a798f524a69bade02a24a95e5417e", AreaID: areas[1].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 11:20:00")},
-		{CitizenIDHash: "0afe2c335af6c6c40d6e93b905031728617bc385e16bea3b81b26fb887f76ca1", AreaID: areas[1].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 13:10:00")},
-		{CitizenIDHash: "cd7ccccce8894be61b784d0daffd2f169f491d03822bd9da7b8bc62585eab14c", AreaID: areas[1].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 14:00:00")},
-		{CitizenIDHash: "bf11eedf5b0deb55cc1e8df88663559d47a5186c54f394137b8b0126ccbf8637", AreaID: areas[2].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 09:00:00")},
-		{CitizenIDHash: "cbe22b81529cdf737479c3c7671b217dfda91a263f0c39cda62c1961767fc9fc", AreaID: areas[2].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 09:30:00")},
-		{CitizenIDHash: "14193cf706990e9ff91242210b365e85faed4135e74c6729d6aa4ed01f94f410", AreaID: areas[2].ID, PhoneNumber: "0929400592", IsVoted: false, VotedAt: nil},
-		{CitizenIDHash: "b653bbe2bef5e72cdc77e2ee34ce505f82ee9ab699136a5b35e3cea426261fbd", AreaID: areas[2].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 10:45:00")},
-		{CitizenIDHash: "5ffcfda5e9c4114eced76d646230c64080106ce534aa3e7d869ae516449dfb9a", AreaID: areas[3].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 08:10:00")},
-		{CitizenIDHash: "42f72dd8c2cee780500e514a11d9de6a76b0ede65741a5c3cb66f94a3229201d", AreaID: areas[3].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 12:30:00")},
-		{CitizenIDHash: "9a27504f65ece25808600e5f557bebaf2ab935d2597499602f9eb2d4111e7c39", AreaID: areas[3].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 15:20:00")},
-		{CitizenIDHash: "9efa6f667e8f08d85cc6106349ea7e93dea78028bc986dee10b8a4af098283a8", AreaID: areas[3].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 16:05:00")},
-		{CitizenIDHash: "179663769254b15efa21a26d0420b873db7b6b512b5d77422bd9c519b86ae395", AreaID: areas[4].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 08:50:00")},
-		{CitizenIDHash: "3555e05ef472d7071981b0d30d909a524ef97b17304a303574713bf2a9ffb2dd", AreaID: areas[4].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 09:40:00")},
-		{CitizenIDHash: "216675eb3dd157942ee9799eda1627eafa55a80fcf74f724e9d03412208bf6fe", AreaID: areas[4].ID, PhoneNumber: "0929400592", IsVoted: false, VotedAt: nil},
-		{CitizenIDHash: "cee14863a6e22a02647c875d886a5d0adc6439e73b26bc8fe943cacdaab8677c", AreaID: areas[4].ID, PhoneNumber: "0929400592", IsVoted: true, VotedAt: timePtr("2026-04-14 11:15:00")},
+		{CitizenIDHash: "342dcd58481f26e0109717a0930621f769707e9091da3697a2312c8973f1b130", AreaID: areas[0].ID, Email: "voter01@test.com", PhoneNumber: "0811111111", IsVoted: false},
+		{CitizenIDHash: "59194e4bf88deb95b5b4e6eb6b09463bdc1592aa13c943f470a148b98974e8ab", AreaID: areas[0].ID, Email: "voter02@test.com", PhoneNumber: "0812222222", IsVoted: false},
+		{CitizenIDHash: "02cde367f2cdd9210f7edb4ddf486032067f7067ac84891a22efa7d9b77de8af", AreaID: areas[0].ID, Email: "voter03@test.com", PhoneNumber: "0813333333", IsVoted: false},
+		{CitizenIDHash: "a69e7a3ee0ac644de72323c3932c528921fdf8319630470f753dbcdd09e7becb", AreaID: areas[0].ID, Email: "piyachat.sal@dome.tu.ac.th", PhoneNumber: "0929400592", IsVoted: false},
+		{CitizenIDHash: "5aba4c653982bfe235c2213b754348b50e8f2d61be0010a6923f18032102dc15", AreaID: areas[1].ID, Email: "voter05@test.com", PhoneNumber: "0821111111", IsVoted: false},
+		{CitizenIDHash: "051b71582088500660bc221f9b2c3971820a798f524a69bade02a24a95e5417e", AreaID: areas[1].ID, Email: "voter06@test.com", PhoneNumber: "0822222222", IsVoted: false},
+		{CitizenIDHash: "0afe2c335af6c6c40d6e93b905031728617bc385e16bea3b81b26fb887f76ca1", AreaID: areas[1].ID, Email: "voter07@test.com", PhoneNumber: "0823333333", IsVoted: false},
+		{CitizenIDHash: "cd7ccccce8894be61b784d0daffd2f169f491d03822bd9da7b8bc62585eab14c", AreaID: areas[1].ID, Email: "voter08@test.com", PhoneNumber: "0824444444", IsVoted: false},
+		{CitizenIDHash: "bf11eedf5b0deb55cc1e8df88663559d47a5186c54f394137b8b0126ccbf8637", AreaID: areas[2].ID, Email: "voter09@test.com", PhoneNumber: "0831111111", IsVoted: false},
+		{CitizenIDHash: "cbe22b81529cdf737479c3c7671b217dfda91a263f0c39cda62c1961767fc9fc", AreaID: areas[2].ID, Email: "voter10@test.com", PhoneNumber: "0832222222", IsVoted: false},
+		{CitizenIDHash: "14193cf706990e9ff91242210b365e85faed4135e74c6729d6aa4ed01f94f410", AreaID: areas[2].ID, Email: "voter11@test.com", PhoneNumber: "0833333333", IsVoted: false},
+		{CitizenIDHash: "b653bbe2bef5e72cdc77e2ee34ce505f82ee9ab699136a5b35e3cea426261fbd", AreaID: areas[2].ID, Email: "voter12@test.com", PhoneNumber: "0834444444", IsVoted: false},
+		{CitizenIDHash: "5ffcfda5e9c4114eced76d646230c64080106ce534aa3e7d869ae516449dfb9a", AreaID: areas[3].ID, Email: "voter13@test.com", PhoneNumber: "0841111111", IsVoted: false},
+		{CitizenIDHash: "42f72dd8c2cee780500e514a11d9de6a76b0ede65741a5c3cb66f94a3229201d", AreaID: areas[3].ID, Email: "voter14@test.com", PhoneNumber: "0842222222", IsVoted: false},
+		{CitizenIDHash: "9a27504f65ece25808600e5f557bebaf2ab935d2597499602f9eb2d4111e7c39", AreaID: areas[3].ID, Email: "voter15@test.com", PhoneNumber: "0843333333", IsVoted: false},
+		{CitizenIDHash: "9efa6f667e8f08d85cc6106349ea7e93dea78028bc986dee10b8a4af098283a8", AreaID: areas[3].ID, Email: "voter16@test.com", PhoneNumber: "0844444444", IsVoted: false},
+		{CitizenIDHash: "179663769254b15efa21a26d0420b873db7b6b512b5d77422bd9c519b86ae395", AreaID: areas[4].ID, Email: "voter17@test.com", PhoneNumber: "0851111111", IsVoted: false},
+		{CitizenIDHash: "3555e05ef472d7071981b0d30d909a524ef97b17304a303574713bf2a9ffb2dd", AreaID: areas[4].ID, Email: "voter18@test.com", PhoneNumber: "0852222222", IsVoted: false},
+		{CitizenIDHash: "216675eb3dd157942ee9799eda1627eafa55a80fcf74f724e9d03412208bf6fe", AreaID: areas[4].ID, Email: "voter19@test.com", PhoneNumber: "0853333333", IsVoted: false},
+		{CitizenIDHash: "cee14863a6e22a02647c875d886a5d0adc6439e73b26bc8fe943cacdaab8677c", AreaID: areas[4].ID, Email: "voter20@test.com", PhoneNumber: "0854444444", IsVoted: false},
 	}
 	if err := db.Create(&voters).Error; err != nil {
 		log.Fatalf("❌ Failed to seed voters: %v", err)
 	}
 
-	// 5. OTPs
-	otps := []models.OTP{
-		{VoterID: voters[0].ID, OTPCode: "123456", RefCode: "ABCD", ExpiresAt: parseTime("2026-06-14 08:35:00"), IsUsed: false},
-		{VoterID: voters[1].ID, OTPCode: "234567", RefCode: "EFGH", ExpiresAt: parseTime("2026-06-14 09:20:00"), IsUsed: false},
-		{VoterID: voters[2].ID, OTPCode: "345678", RefCode: "IJKL", ExpiresAt: parseTime("2026-06-14 10:10:00"), IsUsed: false},
-		{VoterID: voters[3].ID, OTPCode: "456789", RefCode: "MNOP", ExpiresAt: parseTime("2026-06-14 11:00:00"), IsUsed: false},
-		{VoterID: voters[4].ID, OTPCode: "567890", RefCode: "QRST", ExpiresAt: parseTime("2026-06-14 08:50:00"), IsUsed: false},
-		{VoterID: voters[5].ID, OTPCode: "678901", RefCode: "UVWX", ExpiresAt: parseTime("2026-06-14 11:25:00"), IsUsed: false},
-		{VoterID: voters[6].ID, OTPCode: "789012", RefCode: "YZAB", ExpiresAt: parseTime("2026-06-14 13:15:00"), IsUsed: false},
-		{VoterID: voters[7].ID, OTPCode: "890123", RefCode: "CDEF", ExpiresAt: parseTime("2026-06-14 14:05:00"), IsUsed: false},
-		{VoterID: voters[8].ID, OTPCode: "901234", RefCode: "GHIJ", ExpiresAt: parseTime("2026-06-14 09:05:00"), IsUsed: false},
-		{VoterID: voters[9].ID, OTPCode: "012345", RefCode: "KLMN", ExpiresAt: parseTime("2026-06-14 09:35:00"), IsUsed: false},
-		{VoterID: voters[10].ID, OTPCode: "112233", RefCode: "OPQR", ExpiresAt: parseTime("2026-06-14 10:00:00"), IsUsed: false},
-		{VoterID: voters[11].ID, OTPCode: "223344", RefCode: "STUV", ExpiresAt: parseTime("2026-06-14 10:50:00"), IsUsed: false},
-		{VoterID: voters[12].ID, OTPCode: "334455", RefCode: "WXYZ", ExpiresAt: parseTime("2026-06-14 08:15:00"), IsUsed: false},
-		{VoterID: voters[13].ID, OTPCode: "445566", RefCode: "ABCD", ExpiresAt: parseTime("2026-06-14 12:35:00"), IsUsed: false},
-		{VoterID: voters[14].ID, OTPCode: "556677", RefCode: "EFGH", ExpiresAt: parseTime("2026-06-14 15:25:00"), IsUsed: false},
-		{VoterID: voters[15].ID, OTPCode: "667788", RefCode: "IJKL", ExpiresAt: parseTime("2026-06-14 16:10:00"), IsUsed: false},
-		{VoterID: voters[16].ID, OTPCode: "778899", RefCode: "MNOP", ExpiresAt: parseTime("2026-06-14 08:55:00"), IsUsed: false},
-		{VoterID: voters[17].ID, OTPCode: "889900", RefCode: "QRST", ExpiresAt: parseTime("2026-06-14 09:45:00"), IsUsed: false},
-		{VoterID: voters[18].ID, OTPCode: "990011", RefCode: "UVWX", ExpiresAt: parseTime("2026-06-14 10:30:00"), IsUsed: false},
-		{VoterID: voters[19].ID, OTPCode: "001122", RefCode: "YZAB", ExpiresAt: parseTime("2026-06-14 11:20:00"), IsUsed: false},
-	}
-	if err := db.Create(&otps).Error; err != nil {
-		log.Fatalf("❌ Failed to seed otps: %v", err)
-	}
-
-	// 6. Admins
+	// 6. Admins (voter[3] เป็น admin — test account หลัก)
 	admins := []models.Admin{
-		{VoterID: voters[0].ID},
-		{VoterID: voters[1].ID},
-		{VoterID: voters[2].ID},
 		{VoterID: voters[3].ID},
-		{VoterID: voters[4].ID},
 	}
 	if err := db.Create(&admins).Error; err != nil {
 		log.Fatalf("❌ Failed to seed admins: %v", err)
@@ -173,15 +149,13 @@ func SeedData(db *gorm.DB) {
 
 	// 7. SystemConfigs
 	configs := []models.SystemConfig{
-		{AdminID: admins[0].ID, Status: "OPEN", StartTime: parseTime("2026-04-14 08:00:00"), EndTime: parseTime("2026-04-28 17:00:00"), UpdatedAt: parseTime("2026-04-13 20:00:00"), IsActive: true},
+		{AdminID: admins[0].ID, Status: "OPEN", StartTime: parseTime("2026-04-14 08:00:00"), EndTime: parseTime("2026-12-31 17:00:00"), UpdatedAt: parseTime("2026-04-13 20:00:00"), IsActive: true},
 	}
 	if err := db.Create(&configs).Error; err != nil {
 		log.Fatalf("❌ Failed to seed system_configs: %v", err)
 	}
 
-	// ==========================================
-	// เรียกใช้งานไฟล์แยก: จำลองโหวต 15,000 รายการ (seed_votes.go)
-	// ==========================================
+	// 8. Votes 20,000 รายการ (จาก seed_votes.go)
 	SeedVotes(db, areas, parties, candidates)
 
 	log.Println("🎉 Database successfully seeded with ALL modular mock data!")

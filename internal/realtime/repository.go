@@ -16,28 +16,21 @@ func NewRealtimeRepository(db *gorm.DB) RealtimeRepository {
 	return &realtimeRepository{db: db}
 }
 
-// GetAllAreasVotes ดึงจำนวนโหวตรวมของแต่ละเขต
 func (r *realtimeRepository) GetAllAreasVotes() ([]AreaVoteRow, error) {
-
 	var results []AreaVoteRow
-
 	err := r.db.Table("votes v").
 		Select("a.area_id, a.area_name, COUNT(v.vote_id) as total_votes").
 		Joins("JOIN areas a ON v.area_id = a.area_id").
 		Group("a.area_id, a.area_name").
 		Scan(&results).Error
-
 	return results, err
 }
 
-// GetTopCandidatesByArea ดึง Top N ผู้สมัครที่ได้คะแนนสูงสุดของแต่ละเขต
+// GetTopCandidatesByArea returns top N candidates per area using ROW_NUMBER window function
 func (r *realtimeRepository) GetTopCandidatesByArea(limit int) ([]AreaCandidateRow, error) {
-
 	var results []AreaCandidateRow
-
-	// ใช้ subquery + ROW_NUMBER() เพื่อจัด rank แล้วกรองเอา top N
 	subquery := `
-		SELECT 
+		SELECT
 			v.area_id,
 			c.candidate_no,
 			c.full_name AS candidate_name,
@@ -50,18 +43,13 @@ func (r *realtimeRepository) GetTopCandidatesByArea(limit int) ([]AreaCandidateR
 		WHERE v.candidate_id IS NOT NULL
 		GROUP BY v.area_id, c.candidate_no, c.full_name, p.party_name
 	`
-
 	err := r.db.Raw("SELECT area_id, candidate_no, candidate_name, party_name, votes FROM ("+subquery+") ranked WHERE rn <= ?", limit).
 		Scan(&results).Error
-
 	return results, err
 }
 
-// GetPartyVotes ดึงจำนวนโหวตรวมของแต่ละพรรค (บัญชีรายชื่อ)
 func (r *realtimeRepository) GetPartyVotes() ([]PartyVoteRow, error) {
-
 	var results []PartyVoteRow
-
 	err := r.db.Table("votes v").
 		Select("p.party_no, p.party_name, COUNT(v.vote_id) AS votes").
 		Joins("JOIN parties p ON v.party_id = p.party_id").
@@ -69,6 +57,5 @@ func (r *realtimeRepository) GetPartyVotes() ([]PartyVoteRow, error) {
 		Group("p.party_no, p.party_name").
 		Order("votes DESC").
 		Scan(&results).Error
-
 	return results, err
 }

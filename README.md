@@ -1,23 +1,238 @@
-# VoteSpher
+# VoteSpher — ระบบเลือกตั้งออนไลน์
+
+ระบบเลือกตั้งออนไลน์พร้อม Two-Factor Authentication (บัตรประชาชน + OTP ทาง Email/SMS), Secret Ballot, และ Real-time Results
+
+**Stack:** Go 1.23 / Gin / GORM / MySQL · React 18 / Vite / Tailwind CSS
+
 ---
-# ปริญ จิระมหาโภคี (ฟูจิ) FujiDesu
- * POST- /voter/verify
- * POST- /voter/otp-request
 
-# อัฐภิญญา กำหนด (ฟ้าคราม) Autthapinya Kumnod - 6609650749
- * GET- /candidates
- * GET- /parties
+## สิ่งที่ต้องติดตั้ง
 
-# ปิยะชาติ สลางสิงห์ (แบงค์) Bank-e
- * POST-/ballot/submit
- * GET- /ballot/status
+| Tool | เวอร์ชันขั้นต่ำ |
+|------|--------------|
+| Go | 1.22+ |
+| Node.js | 18+ |
+| MySQL | 5.7+ |
 
-# ชญาดา ธรรมวิชัย (น้ำฝน) Chayada Thummavichai-6609650244
- * GET /results/realtime
+---
 
-# รัตนากร วังคีรี (พี่แนม) RW
- * GET- /results/provinces/{provinces_name}/areas/{area_id}
+## ติดตั้งและรันบนเครื่อง (Local)
 
-# ภีมพัฒน์ จิราวัฒวาณิชย์ (เซีย) Peemapat Jiravatvanich-6609650566
- * POST- /voter/otp-confirm
- * PATCH /election/config
+### 1. Clone โปรเจกต์
+
+```bash
+git clone https://github.com/Xagatech/vote.git
+cd vote
+```
+
+### 2. ตั้งค่า Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+แก้ไข `.env`:
+
+```env
+# Database
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=votespher
+
+# Auth
+JWT_SECRET_KEY=change_this_to_random_string
+HASH_SECRET_KEY=change_this_to_another_random_string
+JWT_EXPIRY_HOURS=2
+
+# Email (Gmail SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+SMTP_FROM=your_email@gmail.com
+
+# Server
+PORT=8080
+CORS_ALLOWED_ORIGIN=http://localhost:3000
+
+# Dev mode — เปิดเพื่อใช้ OTP 111111 และ /dev/mock-token
+ENABLE_DEV_ENDPOINTS=false
+```
+
+> **Gmail App Password:** Google Account → Security → 2-Step Verification → App passwords
+
+### 3. ติดตั้ง Dependencies
+
+```bash
+# Backend
+go mod download
+
+# Frontend
+cd frontend && npm install && cd ..
+```
+
+### 4. สร้างฐานข้อมูล
+
+```bash
+# สร้าง schema (ครั้งแรก)
+RUN_MIGRATION=true go run cmd/server/main.go
+
+# เพิ่มข้อมูลตัวอย่าง (optional)
+RUN_SEED=true go run cmd/server/main.go
+```
+
+### 5. รันระบบ
+
+เปิด **2 terminal**:
+
+```bash
+# Terminal 1 — Backend (http://localhost:8080)
+go run cmd/server/main.go
+
+# Terminal 2 — Frontend (http://localhost:3000)
+cd frontend && npm run dev
+```
+
+เปิด **http://localhost:3000**
+
+---
+
+## วิธีใช้งาน
+
+### ขั้นตอน Login
+
+1. กรอกเลขบัตรประชาชน 13 หลัก
+2. เลือกช่องทางรับ OTP (Email หรือ SMS)
+3. กรอก OTP 6 หลักที่ได้รับ
+4. ระบบพาไปหน้าโหวต (voter) หรือ Admin Dashboard (admin)
+
+### บทบาทผู้ใช้
+
+| Role | สิ่งที่ทำได้ |
+|------|-------------|
+| **Voter** | Login → เลือก Candidate → ลงคะแนน → ดูผล Realtime |
+| **Admin** | ทุกอย่างของ Voter + ควบคุม Election State |
+
+### Election State Machine
+
+```
+PREPARE → OPEN → PAUSED → OPEN → CLOSED → COUNTING
+```
+
+Voter โหวตได้เฉพาะตอน state = **OPEN**
+
+---
+
+## Dev Mode
+
+ตั้ง `ENABLE_DEV_ENDPOINTS=true` แล้ว restart backend
+
+- OTP ตายตัว: **111111**
+- Bypass login: `POST /dev/mock-token`
+
+```bash
+curl -X POST http://localhost:8080/dev/mock-token \
+  -H "Content-Type: application/json" \
+  -d '{"voter_id": 21, "area_id": 1, "role": "voter"}'
+```
+
+Test accounts ดูได้ที่ `DEMO.md`
+
+---
+
+## Makefile
+
+```bash
+make run        # รัน backend dev server
+make build      # build binary → bin/server
+make test       # รัน unit tests ทั้งหมด
+```
+
+---
+
+## โครงสร้างโปรเจกต์
+
+```
+vote/
+├── cmd/server/main.go       # Entry point
+├── config/                  # Database connection
+├── internal/
+│   ├── auth/                # Verify, OTP, JWT
+│   ├── election/            # Election state machine
+│   ├── info/                # Candidates & parties
+│   ├── middleware/          # JWT, rate limit, audit log
+│   ├── realtime/            # Live vote aggregation
+│   ├── result/              # Vote result queries
+│   └── voting/              # Ballot submission
+├── pkg/                     # JWT, Email, SMS, Queue
+├── migration/               # Schema + seed data
+├── frontend/                # React 18 / Vite / Tailwind
+├── .env.example
+├── Dockerfile
+├── railway.toml             # Railway deploy config
+└── Makefile
+```
+
+---
+
+## ความปลอดภัย
+
+- **Secret Ballot** — ไม่เชื่อม voter กับ candidate ที่เลือกในฐานข้อมูล
+- **Citizen ID Hashing** — เก็บแค่ HMAC-SHA256
+- **OTP Lockout** — กรอกผิด 5 ครั้งล็อกทันที
+- **Row-level Locking** — ป้องกัน duplicate vote จาก concurrent requests
+- **Rate Limiting** — 60 req/min/IP
+- **Audit Log** — บันทึกทุก ballot submission
+
+---
+
+## Deploy Online (Railway + Aiven)
+
+Backend serve frontend ในตัว — ใช้แค่ **2 services** เท่านั้น
+
+### ขั้นตอน
+
+**1. Database → Aiven**
+1. สมัคร [aiven.io](https://aiven.io) → New Service → MySQL → Free plan
+2. รอ provision → copy Host, Port, User, Password, Database
+3. ถ้าใช้ TLS: download `ca.pem`
+
+**2. Deploy → Railway**
+1. สมัคร [railway.app](https://railway.app) → New Project → Deploy from GitHub repo นี้
+2. Railway detect `Dockerfile` อัตโนมัติ (build frontend + backend รวมกัน)
+3. ตั้ง **Environment Variables**:
+
+```
+DB_HOST=<aiven host>
+DB_PORT=<aiven port>
+DB_USER=<aiven user>
+DB_PASSWORD=<aiven password>
+DB_NAME=defaultdb
+JWT_SECRET_KEY=<random 32+ chars>
+HASH_SECRET_KEY=<random 32+ chars>
+JWT_EXPIRY_HOURS=2
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=<gmail>
+SMTP_PASSWORD=<gmail app password>
+SMTP_FROM=<gmail>
+CORS_ALLOWED_ORIGIN=*
+ENABLE_DEV_ENDPOINTS=false
+```
+
+4. หลัง deploy สำเร็จ — run migration **ครั้งเดียว**:
+   ตั้ง `RUN_MIGRATION=true` → Redeploy → รอเสร็จ → เอาออก → Redeploy อีกครั้ง
+
+5. (Optional) Seed ข้อมูลตัวอย่าง: ทำแบบเดียวกับ `RUN_SEED=true`
+
+6. เปิด URL ที่ Railway ให้มา — ใช้งานได้เลย ✅
+
+> หากใช้ Aiven TLS: ตั้ง `DB_CA_CERT` path หรือ disable SSL ใน Aiven สำหรับ demo
+
+---
+
+## License
+
+MIT

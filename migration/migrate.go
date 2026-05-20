@@ -19,6 +19,7 @@ func Run(db *gorm.DB) {
         &models.Admin{},
         &models.SystemConfig{},
         &models.Vote{},
+        &models.AuditLog{},
     )
 
     if err != nil {
