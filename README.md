@@ -12,172 +12,138 @@
 |------|--------------|
 | Go | 1.22+ |
 | Node.js | 18+ |
-| MySQL | 5.7+ |
+| Docker | 24+ (สำหรับการรันด้วย Docker Compose) |
+| MySQL | 5.7+ (กรณีไม่ได้รันด้วย Docker) |
 
 ---
 
-## ติดตั้งและรันบนเครื่อง (Local)
+## 🚀 การติดตั้งและรันระบบ (วิธีที่แนะนำ)
 
-### 1. Clone โปรเจกต์
+การรันด้วย Docker Compose จะทำให้คุณไม่ต้องติดตั้ง Database หรือตั้งค่าอะไรให้วุ่นวาย เพราะระบบจะรันทุกอย่าง (DB, API, Frontend) ขึ้นมาให้พร้อมใช้งาน
+
+### 1. Clone โปรเจกต์ และตั้งค่า Environment
 
 ```bash
 git clone https://github.com/Xagatech/vote.git
 cd vote
-```
-
-### 2. ตั้งค่า Environment Variables
-
-```bash
 cp .env.example .env
 ```
+*(แก้ไขไฟล์ `.env` ตามความเหมาะสม ดูคำอธิบายตัวแปรได้ในไฟล์)*
 
-แก้ไข `.env`:
+### 2. รันระบบด้วย Docker Compose
 
-```env
-# Database
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=votespher
-
-# Auth
-JWT_SECRET_KEY=change_this_to_random_string
-HASH_SECRET_KEY=change_this_to_another_random_string
-JWT_EXPIRY_HOURS=2
-
-# Email (Gmail SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASSWORD=your_gmail_app_password
-SMTP_FROM=your_email@gmail.com
-
-# Server
-PORT=8080
-CORS_ALLOWED_ORIGIN=http://localhost:3000
-
-# Dev mode — เปิดเพื่อใช้ OTP 111111 และ /dev/mock-token
-ENABLE_DEV_ENDPOINTS=false
-```
-
-> **Gmail App Password:** Google Account → Security → 2-Step Verification → App passwords
-
-### 3. ติดตั้ง Dependencies
+เราเตรียมคำสั่งลัดไว้ให้ใน `Makefile` แล้ว:
 
 ```bash
-# Backend
-go mod download
+# สั่งรันทั้งระบบ (API, DB, Frontend) จะใช้เวลา Build ครั้งแรกสักครู่
+make up
+```
 
-# Frontend
+**รอจนกว่า Container ทั้งหมดจะพร้อมใช้งาน สามารถเข้าเว็บไซต์ได้เลยที่:**
+- **Frontend App:** [http://localhost:3000](http://localhost:3000)
+- **Backend API:** [http://localhost:8080](http://localhost:8080)
+
+หากต้องการหยุดระบบ:
+```bash
+make down      # ปิดระบบ (ข้อมูลยังอยู่)
+make stop      # หยุดชั่วคราว
+make clean     # ⚠️ ลบระบบและเคลียร์ข้อมูล Database ทิ้งทั้งหมด
+```
+
+---
+
+## 💻 การรันแบบ Local (สำหรับ Development)
+
+หากคุณต้องการเขียนโค้ดและรันแบบ Local ล้วนๆ (Hot-reload):
+
+**1. ติดตั้ง Dependencies**
+```bash
+go mod download
 cd frontend && npm install && cd ..
 ```
 
-### 4. สร้างฐานข้อมูล
-
+**2. รัน Backend (Terminal 1)**
 ```bash
-# สร้าง schema (ครั้งแรก)
-RUN_MIGRATION=true go run cmd/server/main.go
-
-# เพิ่มข้อมูลตัวอย่าง (optional)
-RUN_SEED=true go run cmd/server/main.go
+# ถ้าต้องการสร้างตารางหรือใส่ข้อมูลเริ่มต้น ให้เพิ่ม RUN_MIGRATION=true และ RUN_SEED=true นำหน้า
+go run cmd/server/main.go
 ```
 
-### 5. รันระบบ
-
-เปิด **2 terminal**:
-
+**3. รัน Frontend (Terminal 2)**
 ```bash
-# Terminal 1 — Backend (http://localhost:8080)
-go run cmd/server/main.go
-
-# Terminal 2 — Frontend (http://localhost:3000)
 cd frontend && npm run dev
 ```
 
-เปิด **http://localhost:3000**
+เปิด **http://localhost:3000** ใช้งานได้ทันที (Vite จะทำ Proxy ส่ง API ไปหา Backend ที่พอร์ต 8080 ให้อัตโนมัติ)
 
 ---
 
-## วิธีใช้งาน
-
-### ขั้นตอน Login
-
-1. กรอกเลขบัตรประชาชน 13 หลัก
-2. เลือกช่องทางรับ OTP (Email หรือ SMS)
-3. กรอก OTP 6 หลักที่ได้รับ
-4. ระบบพาไปหน้าโหวต (voter) หรือ Admin Dashboard (admin)
-
-### บทบาทผู้ใช้
-
-| Role | สิ่งที่ทำได้ |
-|------|-------------|
-| **Voter** | Login → เลือก Candidate → ลงคะแนน → ดูผล Realtime |
-| **Admin** | ทุกอย่างของ Voter + ควบคุม Election State |
-
-### Election State Machine
-
-```
-PREPARE → OPEN → PAUSED → OPEN → CLOSED → COUNTING
-```
-
-Voter โหวตได้เฉพาะตอน state = **OPEN**
-
----
-
-## Dev Mode
-
-ตั้ง `ENABLE_DEV_ENDPOINTS=true` แล้ว restart backend
-
-- OTP ตายตัว: **111111**
-- Bypass login: `POST /dev/mock-token`
-
-```bash
-curl -X POST http://localhost:8080/dev/mock-token \
-  -H "Content-Type: application/json" \
-  -d '{"voter_id": 21, "area_id": 1, "role": "voter"}'
-```
-
-Test accounts ดูได้ที่ `DEMO.md`
-
----
-
-## Makefile
-
-```bash
-make run        # รัน backend dev server
-make build      # build binary → bin/server
-make test       # รัน unit tests ทั้งหมด
-```
-
----
-
-## โครงสร้างโปรเจกต์
+## 📁 โครงสร้างโปรเจกต์ (Project Structure)
 
 ```
 vote/
-├── cmd/server/main.go       # Entry point
-├── config/                  # Database connection
+├── api/                     # สเปก API (openapi.yaml) สำหรับ Swagger
+├── cmd/server/main.go       # Entry point ฝั่ง Backend
+├── config/                  # Database connection config
+├── frontend/                # React 18 / Vite / Tailwind
+│   ├── nginx.conf           # Reverse Proxy Config สำหรับ Production
+│   └── vercel.json          # Config สำหรับ Deploy บน Vercel
 ├── internal/
 │   ├── auth/                # Verify, OTP, JWT
 │   ├── election/            # Election state machine
 │   ├── info/                # Candidates & parties
 │   ├── middleware/          # JWT, rate limit, audit log
+│   ├── models/              # Global Domain Entities (Database Models)
 │   ├── realtime/            # Live vote aggregation
 │   ├── result/              # Vote result queries
 │   └── voting/              # Ballot submission
-├── pkg/                     # JWT, Email, SMS, Queue
 ├── migration/               # Schema + seed data
-├── frontend/                # React 18 / Vite / Tailwind
+├── pkg/                     # JWT, Email, SMS, Queue
+├── postman/                 # Postman Collection สำหรับเทส API
 ├── .env.example
-├── Dockerfile
-├── railway.toml             # Railway deploy config
-└── Makefile
+├── Dockerfile.backend       # Docker สำหรับ Go API
+├── Dockerfile.frontend      # Docker สำหรับ React App (ใช้ Nginx Proxy)
+├── docker-compose.yml       # รันทั้งระบบ
+└── Makefile                 # คำสั่งลัดการทำงาน
 ```
 
 ---
 
-## ความปลอดภัย
+## 🛠️ คำสั่ง Makefile อื่นๆ ที่น่าสนใจ
+
+```bash
+# 🐛 Logs & Debugging
+make logs        # ดู Log รวมทั้งหมด
+make logs-api    # ดู Log เฉพาะ Backend API
+make logs-db     # ดู Log เฉพาะ Database
+
+# 🧪 Testing
+make test        # รัน unit tests ทั้งหมด
+make test-cover  # รันเทสและดูเปอร์เซ็นต์ Coverage
+make test-html   # รันเทสและเปิดหน้าเว็บสรุป Coverage แบบสวยงาม
+```
+
+---
+
+## 🌍 Deploy Online (Production)
+
+ปัจจุบันเราแยก Frontend และ Backend ออกจากกันอย่างชัดเจน:
+
+### 1. ฝั่ง Backend API (Railway / Render / อื่นๆ)
+1. ตั้งค่า Database บน Cloud (เช่น Aiven MySQL) และนำ Connection String มาใส่ Environment Variables
+2. Deploy โค้ดชุดนี้ขึ้น Railway โดยกำหนดให้ Railway ใช้ `Dockerfile.backend`
+3. ตั้งค่า Env Variables ที่จำเป็น (ดูได้ใน `.env.example`)
+   - `CORS_ALLOWED_ORIGIN=*` หรือกำหนดเป็น URL ของ Frontend 
+4. รัน Migration ด้วยการตั้ง `RUN_MIGRATION=true` ใน Deploy ครั้งแรก
+
+### 2. ฝั่ง Frontend (Vercel)
+1. นำโฟลเดอร์ `frontend/` ไป Deploy ขึ้น Vercel
+2. เนื่องจากมีไฟล์ `vercel.json` อยู่แล้ว ระบบจะทำการ Rewrite Routes ให้
+3. **อย่าลืม!** ต้องตั้งค่า Environment Variable บน Vercel:
+   `VITE_API_URL=https://<url-backend-ของคุณ>` เพื่อให้เว็บยิง API ไปหา Backend จริงได้สำเร็จ
+
+---
+
+## 🔒 ความปลอดภัย (Security Features)
 
 - **Secret Ballot** — ไม่เชื่อม voter กับ candidate ที่เลือกในฐานข้อมูล
 - **Citizen ID Hashing** — เก็บแค่ HMAC-SHA256
@@ -185,51 +151,6 @@ vote/
 - **Row-level Locking** — ป้องกัน duplicate vote จาก concurrent requests
 - **Rate Limiting** — 60 req/min/IP
 - **Audit Log** — บันทึกทุก ballot submission
-
----
-
-## Deploy Online (Railway + Aiven)
-
-Backend serve frontend ในตัว — ใช้แค่ **2 services** เท่านั้น
-
-### ขั้นตอน
-
-**1. Database → Aiven**
-1. สมัคร [aiven.io](https://aiven.io) → New Service → MySQL → Free plan
-2. รอ provision → copy Host, Port, User, Password, Database
-3. ถ้าใช้ TLS: download `ca.pem`
-
-**2. Deploy → Railway**
-1. สมัคร [railway.app](https://railway.app) → New Project → Deploy from GitHub repo นี้
-2. Railway detect `Dockerfile` อัตโนมัติ (build frontend + backend รวมกัน)
-3. ตั้ง **Environment Variables**:
-
-```
-DB_HOST=<aiven host>
-DB_PORT=<aiven port>
-DB_USER=<aiven user>
-DB_PASSWORD=<aiven password>
-DB_NAME=defaultdb
-JWT_SECRET_KEY=<random 32+ chars>
-HASH_SECRET_KEY=<random 32+ chars>
-JWT_EXPIRY_HOURS=2
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=<gmail>
-SMTP_PASSWORD=<gmail app password>
-SMTP_FROM=<gmail>
-CORS_ALLOWED_ORIGIN=*
-ENABLE_DEV_ENDPOINTS=false
-```
-
-4. หลัง deploy สำเร็จ — run migration **ครั้งเดียว**:
-   ตั้ง `RUN_MIGRATION=true` → Redeploy → รอเสร็จ → เอาออก → Redeploy อีกครั้ง
-
-5. (Optional) Seed ข้อมูลตัวอย่าง: ทำแบบเดียวกับ `RUN_SEED=true`
-
-6. เปิด URL ที่ Railway ให้มา — ใช้งานได้เลย ✅
-
-> หากใช้ Aiven TLS: ตั้ง `DB_CA_CERT` path หรือ disable SSL ใน Aiven สำหรับ demo
 
 ---
 

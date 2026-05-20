@@ -1,0 +1,20 @@
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -o votespher ./cmd/server/main.go
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
+ENV TZ=Asia/Bangkok
+WORKDIR /app
+COPY --from=builder /app/votespher .
+
+# === 2 บรรทัดนี้สำคัญมาก! ห้ามลืมเด็ดขาด ===
+COPY .env .
+COPY ca.pem .
+# ==================================
+
+EXPOSE 8080
+CMD ["./votespher"]
