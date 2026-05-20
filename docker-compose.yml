@@ -1,0 +1,46 @@
+services:
+  # 1. Database
+  db:
+    image: mysql:8.0
+    container_name: votespher-mysql-local
+    restart: always
+    environment:
+      TZ: Asia/Bangkok
+      MYSQL_ROOT_PASSWORD: yourpassword
+      MYSQL_DATABASE: votespher_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # 2. Backend (API)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend # ชี้ไปที่ไฟล์ของ Backend
+    container_name: votespher-api
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    environment:
+      LOCAL_DB_HOST: db
+      LOCAL_DB_PORT: 3306
+
+  # 3. Frontend (Web)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend # ชี้ไปที่ไฟล์ของ Frontend
+    container_name: votespher-frontend
+    restart: always
+    ports:
+      - "3000:80" # แมปพอร์ต 3000 เข้ากับพอร์ต 80 ของ Nginx
+    depends_on:
+      - api
+
+volumes:
+  mysql_data:

@@ -1,0 +1,667 @@
+openapi: 3.0.3
+info:
+  title: VoteSpher API
+  description: ระบบลงคะแนนเลือกตั้งออนไลน์ — VoteSpher
+  version: 2.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local Development
+
+tags:
+  - name: Auth
+    description: การยืนยันตัวตนผู้มีสิทธิเลือกตั้ง
+  - name: Info
+    description: ข้อมูลผู้สมัครและพรรคการเมือง
+  - name: Result
+    description: ผลการนับคะแนน
+  - name: Realtime
+    description: ผลโหวตแบบ real-time
+  - name: Voting
+    description: การลงคะแนนเลือกตั้ง (ต้อง Login)
+  - name: Admin
+    description: จัดการระบบเลือกตั้ง (Admin เท่านั้น)
+
+paths:
+
+  # ==========================================
+  # Auth
+  # ==========================================
+
+  /voter/verify:
+    post:
+      tags: [Auth]
+      summary: ตรวจสอบสิทธิ์ผู้มีสิทธิเลือกตั้ง
+      description: ตรวจสอบจากเลขบัตรประชาชน 13 หลัก
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyVoterRequest'
+      responses:
+        '200':
+          description: พบข้อมูลผู้มีสิทธิเลือกตั้ง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyVoterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /voter/otp-request:
+    post:
+      tags: [Auth]
+      summary: ขอ OTP
+      description: ขอรหัส OTP เพื่อยืนยันตัวตน (ส่ง SMS ในโหมด production)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPRequestRequest'
+      responses:
+        '200':
+          description: ส่ง OTP สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTPRequestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /voter/otp-confirm:
+    post:
+      tags: [Auth]
+      summary: ยืนยัน OTP และรับ JWT Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPConfirmRequest'
+      responses:
+        '200':
+          description: ยืนยัน OTP สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OTPConfirmResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # Info
+  # ==========================================
+
+  /candidates:
+    get:
+      tags: [Info]
+      summary: ดึงรายชื่อผู้สมัครตามเขต
+      parameters:
+        - name: area_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: รหัสเขตเลือกตั้ง
+      responses:
+        '200':
+          description: รายชื่อผู้สมัคร
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Candidate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /parties:
+    get:
+      tags: [Info]
+      summary: ดึงรายชื่อพรรคการเมืองทั้งหมด
+      responses:
+        '200':
+          description: รายชื่อพรรคการเมือง
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Party'
+
+  # ==========================================
+  # Result
+  # ==========================================
+
+  /results/area/{id}:
+    get:
+      tags: [Result]
+      summary: ดึงผลการนับคะแนนของเขตเลือกตั้ง
+      description: แสดงผลคะแนนผู้สมัครรายเขตพร้อมสังกัดพรรค และคะแนนพรรคบัญชีรายชื่อ
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: รหัสเขตเลือกตั้ง
+      responses:
+        '200':
+          description: ผลการนับคะแนน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AreaResultResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # Realtime
+  # ==========================================
+
+  /results/areas:
+    get:
+      tags: [Realtime]
+      summary: ดึงผลโหวตรวม real-time ทุกเขต
+      description: |
+        แสดงผลโหวตรวมของทุกเขต พร้อม Top 3 ผู้สมัครที่ได้คะแนนสูงสุดในแต่ละเขต
+        และคะแนนรวมของแต่ละพรรค (บัญชีรายชื่อ)
+      responses:
+        '200':
+          description: ผลโหวตรวม real-time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==========================================
+  # Voting (Protected)
+  # ==========================================
+
+  /ballot/submit:
+    post:
+      tags: [Voting]
+      summary: ลงคะแนนเลือกตั้ง
+      description: |
+        ลงคะแนนผู้สมัครรายเขต + พรรคบัญชีรายชื่อ
+        `voter_id` และ `area_id` ดึงจาก JWT Token อัตโนมัติ ไม่ต้องส่งใน body
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitBallotRequest'
+      responses:
+        '201':
+          description: ลงคะแนนสำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /ballot/status:
+    get:
+      tags: [Voting]
+      summary: ตรวจสอบสถานะการเลือกตั้งและการลงคะแนน
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: สถานะการเลือกตั้ง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BallotStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # Admin (Protected + Role)
+  # ==========================================
+
+  /election/config:
+    patch:
+      tags: [Admin]
+      summary: อัปเดตการตั้งค่าการเลือกตั้ง
+      description: ต้องมี JWT Token ที่มี role เป็น admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfigRequest'
+      responses:
+        '200':
+          description: อัปเดตสำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ==========================================
+# Components
+# ==========================================
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ---- Responses ----
+  responses:
+    BadRequest:
+      description: ข้อมูล request ไม่ถูกต้อง
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: ไม่มี Token หรือ Token หมดอายุ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: ไม่มีสิทธิ์ดำเนินการ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: ไม่พบข้อมูล
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: เกิดข้อผิดพลาดภายใน Server
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  # ---- Schemas ----
+  schemas:
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "ข้อความแสดงข้อผิดพลาด"
+
+    SuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: บันทึกคะแนนสำเร็จ
+
+    # Auth Schemas
+    VerifyVoterRequest:
+      type: object
+      required: [citizen_id]
+      properties:
+        citizen_id:
+          type: string
+          example: "1234567890123"
+          description: เลขบัตรประชาชน 13 หลัก
+
+    VoterInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "สมชาย ใจดี"
+        area_id:
+          type: integer
+          example: 1
+        area_name:
+          type: string
+          example: "เขต 1"
+        province:
+          type: string
+          example: "กรุงเทพมหานคร"
+        is_voted:
+          type: boolean
+          example: false
+
+    VerifyVoterResponse:
+      type: object
+      properties:
+        voter_id:
+          type: integer
+          example: 42
+        voter_info:
+          $ref: '#/components/schemas/VoterInfo'
+
+    OTPRequestRequest:
+      type: object
+      required: [voter_id]
+      properties:
+        voter_id:
+          type: integer
+          example: 42
+
+    OTPRequestResponse:
+      type: object
+      properties:
+        otp_code:
+          type: string
+          example: "123456"
+          description: แสดงเฉพาะโหมด mock/development
+        ref_code:
+          type: string
+          example: "ABC123"
+
+    OTPConfirmRequest:
+      type: object
+      required: [otp_code, ref_code]
+      properties:
+        otp_code:
+          type: string
+          example: "123456"
+        ref_code:
+          type: string
+          example: "ABC123"
+
+    OTPConfirmResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIs..."
+
+    # Info Schemas
+    Candidate:
+      type: object
+      properties:
+        candidate_no:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "สมชาย ใจดี"
+        party_id:
+          type: integer
+          example: 1
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+        logo_url:
+          type: string
+          example: "https://example.com/logo.png"
+        biography:
+          type: string
+          example: "อดีต สส. 3 สมัย"
+
+    Party:
+      type: object
+      properties:
+        party_id:
+          type: integer
+          example: 1
+        party_no:
+          type: integer
+          example: 1
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+        logo_url:
+          type: string
+          example: "https://example.com/logo.png"
+
+    # Result Schemas
+    CandidateResult:
+      type: object
+      properties:
+        candidate_no:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "สมชาย ใจดี"
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+          description: แสดง "ไม่สังกัดพรรค" หากไม่มีพรรค
+        votes:
+          type: integer
+          example: 15234
+
+    PartyResult:
+      type: object
+      properties:
+        party_no:
+          type: integer
+          example: 1
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+        votes:
+          type: integer
+          example: 18000
+
+    AreaResultResponse:
+      type: object
+      properties:
+        area_id:
+          type: integer
+          example: 1
+        area_name:
+          type: string
+          example: "เขต 1"
+        last_updated:
+          type: string
+          example: "2026-05-17T08:00:00Z"
+        candidate_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidateResult'
+        party_list_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartyResult'
+
+    # Realtime Schemas
+    RealtimeCandidateResponse:
+      type: object
+      properties:
+        candidate_no:
+          type: integer
+          example: 1
+        candidate_name:
+          type: string
+          example: "สมชาย ใจดี"
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+        votes:
+          type: integer
+          example: 12500
+
+    RealtimeAreaResponse:
+      type: object
+      properties:
+        area_id:
+          type: integer
+          example: 1
+        area_name:
+          type: string
+          example: "เขต 1"
+        total_votes:
+          type: integer
+          example: 27334
+        candidates:
+          type: array
+          description: Top 3 ผู้สมัครที่ได้คะแนนสูงสุด
+          items:
+            $ref: '#/components/schemas/RealtimeCandidateResponse'
+
+    RealtimePartyResponse:
+      type: object
+      properties:
+        party_no:
+          type: integer
+          example: 1
+        party_name:
+          type: string
+          example: "พรรคประชาชน"
+        votes:
+          type: integer
+          example: 185000
+
+    RealtimeResponse:
+      type: object
+      properties:
+        total_votes:
+          type: integer
+          example: 500000
+        last_updated:
+          type: string
+          example: "2026-05-17T08:30:00Z"
+        areas:
+          type: array
+          items:
+            $ref: '#/components/schemas/RealtimeAreaResponse'
+        party:
+          type: array
+          description: คะแนนรวมบัญชีรายชื่อของแต่ละพรรค
+          items:
+            $ref: '#/components/schemas/RealtimePartyResponse'
+
+    # Voting Schemas
+    SubmitBallotRequest:
+      type: object
+      required: [candidate_no, party_no]
+      properties:
+        candidate_no:
+          type: integer
+          example: 1
+          description: หมายเลขผู้สมัครในเขต
+        party_no:
+          type: integer
+          example: 3
+          description: หมายเลขพรรคบัญชีรายชื่อ
+
+    BallotStatusData:
+      type: object
+      properties:
+        election_status:
+          type: string
+          enum: [PREPARE, OPEN, PAUSED, CLOSED]
+          example: OPEN
+        start_time:
+          type: string
+          format: date-time
+          example: "2026-05-17T08:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          example: "2026-05-17T17:00:00Z"
+        server_time:
+          type: string
+          format: date-time
+          example: "2026-05-17T10:30:00Z"
+        is_voted:
+          type: boolean
+          example: false
+
+    BallotStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: ดึงข้อมูลสถานะสำเร็จ
+        data:
+          $ref: '#/components/schemas/BallotStatusData'
+
+    # Admin Schemas
+    UpdateConfigRequest:
+      type: object
+      required: [status, start_time, end_time]
+      properties:
+        status:
+          type: string
+          enum: [PREPARE, OPEN, PAUSED, CLOSED, COUNTING]
+          example: OPEN
+        start_time:
+          type: string
+          format: date-time
+          example: "2026-05-17T08:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          example: "2026-05-17T17:00:00Z"
+
+    ConfigResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: อัปเดตการตั้งค่าระบบเลือกตั้งเรียบร้อยแล้ว
+        data:
+          type: object
+          properties:
+            config_id:
+              type: integer
+              example: 1
+            status:
+              type: string
+              example: OPEN
+            start_time:
+              type: string
+              format: date-time
+            end_time:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            is_active:
+              type: boolean
+              example: true
